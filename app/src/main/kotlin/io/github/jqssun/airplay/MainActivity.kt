@@ -17,6 +17,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -93,7 +95,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            AirPlayTheme {
+            val themeMode by viewModel.themeMode.collectAsState()
+            AirPlayTheme(themeMode = themeMode) {
                 MainScreen(
                     viewModel = viewModel,
                     isInPip = isInPip.value,

@@ -11,7 +11,7 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 - FFmpeg: `38b88335f99e76ed89ff3c93f877fdefce736c13` (`n8.1.2`)
 - libplist: `f41b1ea67045e0c09339974d83e389972d84f166`
 - openssl-cmake: `4edd36a8dab5f85a8f92650b5bdf6e0cab13aab8`
-- Source date epoch: `1785758500`
+- Source date epoch: derive from the release commit with `git log -1 --pretty=%ct`
 - Licence: GPLv3. Preserve this source and licence when distributing the APK.
 
 ## Shield-specific changes
@@ -21,9 +21,10 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 - ARM64 and ARMv7 native libraries for Shield TV variants
 - Boot auto-start and background operation enabled by default
 - Sticky service recovery when Android kills the process, only while **Run in background** is enabled
-- Thirteen unit tests for service restart, opt-out behavior, log sanitization, and local-pause stop handling
+- Eighteen unit tests for service restart, opt-out behavior, log sanitization, local-pause stop handling, and theme policy
 - Media URLs are sanitized before logging; credentials, paths, queries, and fragments are removed
 - Shield-remote pause remains resumable even when iOS immediately closes its AirPlay video connection
+- System, Light, and Dark app themes persist and update without restarting the receiver
 
 ## Features
 
@@ -57,7 +58,7 @@ The Dockerfile pins the base image by digest and installs these Android componen
 - Gradle `8.11.1` from the checked-in wrapper
 
 ```bash
-docker build --pull=false -t byte-airplay-builder:api36-ndk27 docker
+docker build --pull=false -t shield-airplay-builder docker
 ```
 
 Create a private signing keystore outside the repository and put its absolute path and credentials in ignored `local.properties` keys named `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`.
@@ -71,28 +72,28 @@ docker run --rm --user "$(id -u):$(id -g)" \
   -e GRADLE_USER_HOME=/gradle-cache \
   -e SOURCE_DATE_EPOCH \
   -v "$PWD:/workspace" \
-  -v "$HOME/.cache/byte-airplay-gradle:/gradle-cache" \
-  -v "$HOME/.hermes/keys:$HOME/.hermes/keys:ro" \
+  -v "$HOME/.cache/shield-airplay-gradle:/gradle-cache" \
+  -v "$HOME/.android-signing:/signing:ro" \
   -w /workspace \
-  byte-airplay-builder:api36-ndk27 \
+  shield-airplay-builder \
   ./gradlew clean testDebugUnitTest --no-daemon --max-workers=2 \
     '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8'
 
 docker run --rm --user "$(id -u):$(id -g)" \
   -e HOME=/tmp -e GRADLE_USER_HOME=/gradle-cache -e SOURCE_DATE_EPOCH \
   -v "$PWD:/workspace" \
-  -v "$HOME/.cache/byte-airplay-gradle:/gradle-cache" \
-  -v "$HOME/.hermes/keys:$HOME/.hermes/keys:ro" \
-  -w /workspace byte-airplay-builder:api36-ndk27 \
+  -v "$HOME/.cache/shield-airplay-gradle:/gradle-cache" \
+  -v "$HOME/.android-signing:/signing:ro" \
+  -w /workspace shield-airplay-builder \
   ./gradlew lintRelease --no-daemon --max-workers=2 \
     '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8'
 
 docker run --rm --user "$(id -u):$(id -g)" \
   -e HOME=/tmp -e GRADLE_USER_HOME=/gradle-cache -e SOURCE_DATE_EPOCH \
   -v "$PWD:/workspace" \
-  -v "$HOME/.cache/byte-airplay-gradle:/gradle-cache" \
-  -v "$HOME/.hermes/keys:$HOME/.hermes/keys:ro" \
-  -w /workspace byte-airplay-builder:api36-ndk27 \
+  -v "$HOME/.cache/shield-airplay-gradle:/gradle-cache" \
+  -v "$HOME/.android-signing:/signing:ro" \
+  -w /workspace shield-airplay-builder \
   ./gradlew assembleRelease --no-daemon --max-workers=2 \
     '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8'
 ```

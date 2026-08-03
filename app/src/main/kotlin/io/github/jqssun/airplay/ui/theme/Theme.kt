@@ -12,9 +12,10 @@ import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AirPlayTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = themeMode.useDarkColors(isSystemInDarkTheme())
     val colorScheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val ctx = LocalContext.current

@@ -13,6 +13,7 @@ import io.github.jqssun.airplay.Prefs
 import io.github.jqssun.airplay.audio.TrackInfo
 import io.github.jqssun.airplay.service.AirPlayService
 import io.github.jqssun.airplay.service.AirPlayService.ServerState
+import io.github.jqssun.airplay.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -185,6 +186,11 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
 
     private val _launchOnConnect = MutableStateFlow(prefs.getBoolean(Prefs.LAUNCH_ON_CONNECT, Prefs.DEF_LAUNCH_ON_CONNECT))
     val launchOnConnect: StateFlow<Boolean> = _launchOnConnect.asStateFlow()
+
+    private val _themeMode = MutableStateFlow(
+        ThemeMode.fromStorage(prefs.getString(Prefs.THEME_MODE, Prefs.DEF_THEME_MODE))
+    )
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     // debug
     private val _debugEnabled = MutableStateFlow(prefs.getBoolean(Prefs.DEBUG_ENABLED, Prefs.DEF_DEBUG_ENABLED))
@@ -408,6 +414,10 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
     fun setAdvertiseVideo(v: Boolean) { _advertiseVideo.value = v; prefs.edit().putBoolean(Prefs.ADVERTISE_VIDEO, v).apply(); _applyByServerRestart() }
     fun setAdvertiseAudio(v: Boolean) { _advertiseAudio.value = v; prefs.edit().putBoolean(Prefs.ADVERTISE_AUDIO, v).apply(); _applyByServerRestart() }
     fun setLaunchOnConnect(v: Boolean) { _launchOnConnect.value = v; prefs.edit().putBoolean(Prefs.LAUNCH_ON_CONNECT, v).apply() }
+    fun setThemeMode(v: ThemeMode) {
+        _themeMode.value = v
+        prefs.edit().putString(Prefs.THEME_MODE, v.storageValue).apply()
+    }
     fun setDebugEnabled(v: Boolean) { _debugEnabled.value = v; prefs.edit().putBoolean(Prefs.DEBUG_ENABLED, v).apply() }
     fun setDeveloperOptions(v: Boolean) {
         _developerOptions.value = v

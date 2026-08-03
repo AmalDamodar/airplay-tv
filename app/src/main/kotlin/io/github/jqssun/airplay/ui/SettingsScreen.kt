@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.jqssun.airplay.Prefs
 import io.github.jqssun.airplay.R
 import io.github.jqssun.airplay.realDisplaySize
+import io.github.jqssun.airplay.ui.theme.ThemeMode
 import io.github.jqssun.airplay.viewmodel.MainViewModel
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -70,6 +71,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val audioCushionMs by viewModel.audioCushionMs.collectAsState()
     val audioAdaptiveStep by viewModel.audioAdaptiveStep.collectAsState()
     val oboeBufferFrames by viewModel.oboeBufferFrames.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
 
     Column(
         modifier = Modifier
@@ -188,6 +190,11 @@ fun SettingsScreen(viewModel: MainViewModel) {
         )
 
         SectionHeader(stringResource(R.string.section_display))
+
+        SettingThemeMode(
+            value = themeMode,
+            onValueChange = viewModel::setThemeMode,
+        )
 
         SettingSwitch(
             title = stringResource(R.string.setting_idle_preview),
@@ -645,6 +652,38 @@ private fun SettingChipField(
                 }
             }
         }
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingThemeMode(
+    value: ThemeMode,
+    onValueChange: (ThemeMode) -> Unit,
+) {
+    val choices = listOf(
+        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+        ThemeMode.DARK to stringResource(R.string.theme_dark),
+    )
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.setting_theme)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.setting_theme_desc))
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    choices.forEach { (mode, label) ->
+                        FilterChip(
+                            selected = value == mode,
+                            onClick = { onValueChange(mode) },
+                            label = { Text(label) },
+                            modifier = Modifier.dpadFocus(),
+                        )
+                    }
+                }
+            }
+        },
     )
 }
 

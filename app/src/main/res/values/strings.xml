@@ -97,6 +97,11 @@
     <string name="setting_allow_new_conn_desc">Drop current client when a new one connects</string>
 
     <!-- Settings: Display -->
+    <string name="setting_theme">App theme</string>
+    <string name="setting_theme_desc">Choose the appearance of the Shield AirPlay interface</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
     <string name="setting_idle_preview">Idle screen preview</string>
     <string name="setting_idle_preview_desc">Show video surface while waiting for a connection</string>
     <string name="setting_auto_fullscreen">Enter fullscreen automatically</string>
