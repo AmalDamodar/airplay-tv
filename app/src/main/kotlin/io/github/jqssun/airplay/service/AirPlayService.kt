@@ -296,13 +296,27 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_START_SERVER) {
+        super.onStartCommand(intent, flags, startId)
+        val runInBackground = prefs.getBoolean(
+            Prefs.RUN_IN_BACKGROUND,
+            Prefs.DEF_RUN_IN_BACKGROUND,
+        )
+        if (ServiceRestartPolicy.shouldStartServer(
+                action = intent?.action,
+                explicitStartAction = ACTION_START_SERVER,
+                runInBackground = runInBackground,
+            )
+        ) {
             promoteToForeground()
             val name = prefs.getString(Prefs.SERVER_NAME, Prefs.DEF_SERVER_NAME) ?: Prefs.DEF_SERVER_NAME
             startServer(name, ensureServiceStarted = false)
             if (_serverState.value != ServerState.RUNNING) stopSelf(startId)
         }
-        return START_NOT_STICKY
+        return if (ServiceRestartPolicy.shouldRestartAfterKill(
+                serverRunning = _serverState.value == ServerState.RUNNING,
+                runInBackground = runInBackground,
+            )
+        ) START_STICKY else START_NOT_STICKY
     }
 
     fun startServer(name: String) {
@@ -550,6 +564,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         log(message)
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onDestroy() {
         stopServer()
         dacpPlayer.release()
