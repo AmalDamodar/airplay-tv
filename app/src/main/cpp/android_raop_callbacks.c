@@ -285,7 +285,8 @@ static bool _check_register(void *cls, const char *pk_str) {
 
 static void _video_play(void *cls, const char *location, const float start_position) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
-    LOGI("video_play: %s @ %.2fs", location ? location : "(null)", start_position);
+    /* HLS locations can contain credentials and signed query tokens. */
+    LOGI("video_play @ %.2fs", start_position);
     pthread_mutex_lock(&ctx->playback_info_lock);
     ctx->play_ready = 0;
     pthread_mutex_unlock(&ctx->playback_info_lock);

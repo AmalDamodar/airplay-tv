@@ -21,8 +21,9 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 - ARM64 and ARMv7 native libraries for Shield TV variants
 - Boot auto-start and background operation enabled by default
 - Sticky service recovery when Android kills the process, only while **Run in background** is enabled
-- Nine unit tests for explicit start, process restart, opt-out behavior, and log sanitization
+- Thirteen unit tests for service restart, opt-out behavior, log sanitization, and local-pause stop handling
 - Media URLs are sanitized before logging; credentials, paths, queries, and fragments are removed
+- Shield-remote pause remains resumable even when iOS immediately closes its AirPlay video connection
 
 ## Features
 

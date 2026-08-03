@@ -106,6 +106,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     private val _videoPlaybackInfo = MutableStateFlow(VideoPlaybackInfo())
     val videoPlaybackInfo = _videoPlaybackInfo.asStateFlow()
 
+    // iOS sends POST /stop immediately after a receiver-local pause. Keep the local
+    // player session alive briefly so the same remote can resume it.
+    @Volatile private var _localVideoPauseAtMs: Long? = null
+
     // bumped per /play so the ui resets transport state on back-to-back plays too
     private val _videoPlaySeq = MutableStateFlow(0L)
     val videoPlaySeq = _videoPlaySeq.asStateFlow()
@@ -216,7 +220,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
                     if (_videoPlaybackActive.value) {
-                        airPlayVideoPlayer.setPlaying(true)
+                        setVideoPlaying(true)
                         return
                     }
                     _setPlaying(true)
@@ -224,7 +228,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                 }
                 override fun onPause() {
                     if (_videoPlaybackActive.value) {
-                        airPlayVideoPlayer.setPlaying(false)
+                        setVideoPlaying(false)
                         return
                     }
                     _setPlaying(false)
@@ -525,6 +529,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     fun setVideoPlaying(playing: Boolean) {
+        if (!_videoPlaybackActive.value) return
+        _localVideoPauseAtMs = if (playing) null else SystemClock.elapsedRealtime()
         airPlayVideoPlayer.setPlaying(playing)
     }
 
@@ -556,6 +562,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     private fun _endVideoPlayback(message: String) {
         if (!_videoPlaybackActive.value) return
+        _localVideoPauseAtMs = null
         // lingering polls after a stop must not bounce the UI back to a pending session
         _videoPollSuppressed = true
         _videoPlaybackActive.value = false
@@ -590,6 +597,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onVideoPlay(location: String, startPositionSeconds: Float) {
+        _localVideoPauseAtMs = null
         _videoLocation.value = location
         _videoPlaySeq.value++
         _videoPollSuppressed = false
@@ -612,7 +620,20 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         airPlayVideoPlayer.setRate(rate)
     }
 
-    override fun onVideoStop() = _endVideoPlayback("AirPlay Video stopped")
+    override fun onVideoStop() {
+        val now = SystemClock.elapsedRealtime()
+        if (VideoStopPolicy.shouldIgnoreRemoteStop(
+                localPauseAtMs = _localVideoPauseAtMs,
+                nowMs = now,
+                playerIsPaused = !_videoPlaybackInfo.value.playing,
+                graceMs = LOCAL_PAUSE_REMOTE_STOP_GRACE_MS,
+            )
+        ) {
+            log("Ignored AirPlay stop after local pause")
+            return
+        }
+        _endVideoPlayback("AirPlay Video stopped")
+    }
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         clearPin()
@@ -1024,6 +1045,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         // shared with dpad/double-tap seeks
         const val VIDEO_SEEK_STEP_MS = 10_000L
         const val VIDEO_POLL_PENDING_TIMEOUT_MS = 3_000L
+        const val LOCAL_PAUSE_REMOTE_STOP_GRACE_MS = 2_000L
 
         private const val AUDIO_CONFIG_DEBOUNCE_MS = 500L
     }

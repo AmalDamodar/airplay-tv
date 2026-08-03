@@ -9,5 +9,6 @@
 .externalNativeBuild/
 .cxx/
 /dist/
+/device-verification/
 
 *.jks
