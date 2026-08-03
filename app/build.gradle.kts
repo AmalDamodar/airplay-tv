@@ -34,8 +34,8 @@ android {
         applicationId = "no.gior.shieldairplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0-shield"
+        versionCode = 101
+        versionName = "1.0.1-shield"
 
         externalNativeBuild {
             cmake {

@@ -601,7 +601,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         airPlayVideoPlayer.play(location, startPositionSeconds)
         // claim media-button routing for keys that arrive as media-session events
         mediaSession?.isActive = true
-        log("AirPlay Video play: $location @ ${startPositionSeconds}s")
+        log("AirPlay Video play: ${LogSanitizer.mediaLocation(location)} @ ${startPositionSeconds}s")
     }
 
     override fun onVideoScrub(positionSeconds: Float) {

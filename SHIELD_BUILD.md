@@ -21,7 +21,8 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 - ARM64 and ARMv7 native libraries for Shield TV variants
 - Boot auto-start and background operation enabled by default
 - Sticky service recovery when Android kills the process, only while **Run in background** is enabled
-- Six unit tests for explicit start, process restart, unrelated commands, and opt-out behavior
+- Nine unit tests for explicit start, process restart, opt-out behavior, and log sanitization
+- Media URLs are sanitized before logging; credentials, paths, queries, and fragments are removed
 
 ## Features
 
@@ -48,7 +49,7 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 The Dockerfile pins the base image by digest and installs these Android components:
 
 - JDK 21
-- Android SDK/API 36
+- Android SDK/API 36 and API-compatible Android Gradle Plugin 8.10.1
 - Android Build Tools 35 and 36
 - Android NDK `27.0.12077973`
 - CMake `3.22.1`
