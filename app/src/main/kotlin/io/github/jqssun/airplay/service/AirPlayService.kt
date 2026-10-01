@@ -45,9 +45,11 @@ import io.github.jqssun.airplay.bridge.NativeBridge
 import io.github.jqssun.airplay.bridge.RaopCallbackHandler
 import io.github.jqssun.airplay.discovery.NsdServiceManager
 import io.github.jqssun.airplay.download.VideoDownloader
+import io.github.jqssun.airplay.renderer.CallbackGate
 import io.github.jqssun.airplay.renderer.AirPlayVideoPlayer
 import io.github.jqssun.airplay.renderer.AudioRenderer
 import io.github.jqssun.airplay.renderer.VideoRenderer
+import io.github.jqssun.airplay.service.VideoSessionPolicy.Reason
 import io.github.jqssun.airplay.viewmodel.DebugInfo
 import java.net.NetworkInterface
 import java.security.SecureRandom
@@ -70,6 +72,7 @@ data class VideoPlaybackInfo(
 class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     private var nativeHandle = 0L
+    private val _serverCallbacks = CallbackGate()
     private var nsdManager: NsdServiceManager? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var foregroundStarted = false
@@ -109,9 +112,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     private val _videoPlaybackInfo = MutableStateFlow(VideoPlaybackInfo())
     val videoPlaybackInfo = _videoPlaybackInfo.asStateFlow()
 
-    // iOS sends POST /stop immediately after a receiver-local pause. Keep the local
-    // player session alive briefly so the same remote can resume it.
-    @Volatile private var _localVideoPauseAtMs: Long? = null
+    private val _videoSessionHeld = MutableStateFlow(false)
+    val videoSessionHeld = _videoSessionHeld.asStateFlow()
+    private var _localVideoPauseAtMs: Long? = null
+    private var _videoGeneration = 0L
 
     // bumped per /play so the ui resets transport state on back-to-back plays too
     private val _videoPlaySeq = MutableStateFlow(0L)
@@ -309,10 +313,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             _videoPlaybackSize.value = width to height
         }
         airPlayVideoPlayer.onTitle = { _videoTitle.value = it ?: "" }
-        airPlayVideoPlayer.onEnded = { _endVideoPlayback("AirPlay Video stopped (player)") }
+        airPlayVideoPlayer.onEnded = { _decideVideoSession(Reason.PLAYER_ENDED) }
+        airPlayVideoPlayer.onUnrecoverableError = { _decideVideoSession(Reason.PLAYER_ERROR_UNRECOVERABLE) }
         airPlayVideoPlayer.onPlaybackInfo = { snapshot ->
             if (nativeHandle != 0L) {
-                NativeBridge.nativeUpdatePlaybackInfo(nativeHandle, snapshot.position, snapshot.duration, snapshot.rate, snapshot.ready)
+                NativeBridge.nativeUpdatePlaybackInfo(nativeHandle, _videoGeneration, snapshot.position, snapshot.duration, snapshot.rate, snapshot.ready, snapshot.buffering)
             }
             if (_videoPlaybackActive.value) {
                 _updateVideoPlaybackState(snapshot.position, snapshot.rate)
@@ -383,6 +388,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
             audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
         )
+        _serverCallbacks.invalidate()
         nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin)
         if (nativeHandle == 0L) {
             log("Native init failed")
@@ -507,6 +513,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     fun stopServer() {
+        // Invalidate queued native work before joining/destroying the native server.
+        _serverState.value = ServerState.STOPPED
+        _serverCallbacks.invalidate()
+        _decideVideoSession(Reason.SERVER_STOP)
+        _clearVideoHold()
         audioRenderer.detachEngine()
         if (nativeHandle != 0L) {
             NativeBridge.nativeStop(nativeHandle)
@@ -559,6 +570,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     fun setVideoPlaying(playing: Boolean) {
         if (!_videoPlaybackActive.value) return
         _localVideoPauseAtMs = if (playing) null else SystemClock.elapsedRealtime()
+        if (playing) {
+            _sessionLog("LOCAL_RESUME")
+            _clearVideoHold()
+        } else _sessionLog("LOCAL_PAUSE")
         airPlayVideoPlayer.setPlaying(playing)
     }
 
@@ -582,21 +597,52 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         airPlayVideoPlayer.seekBy(deltaMs)
     }
 
-    fun stopVideoPlayback() = _endVideoPlayback("AirPlay Video stopped (local)")
+    fun stopVideoPlayback() = _decideVideoSession(Reason.LOCAL_EXIT)
 
     fun downloadVideo() {
         _videoLocation.value?.let { videoDownloader.start(it) }
     }
 
-    private fun _endVideoPlayback(message: String) {
+    private fun _sessionLog(reason: String) {
+        val message = "$reason positionMs=${_videoPlaybackInfo.value.positionMs}"
+        Log.i("AirPlaySession", message)
+        logCallback?.invoke("AirPlaySession $message")
+    }
+
+    private fun _clearVideoHold() {
+        _videoSessionHeld.value = false
+    }
+
+    // All session and player state is serialized on the main looper.
+    private fun _decideVideoSession(reason: Reason) {
+        if (!_videoPlaybackActive.value) return
+        val info = _videoPlaybackInfo.value
+        val decision = VideoSessionPolicy.decide(
+            reason, !info.playing, _localVideoPauseAtMs, SystemClock.elapsedRealtime(),
+            LOCAL_PAUSE_REMOTE_STOP_GRACE_MS,
+        )
+        _sessionLog("${reason.name}_${decision.name}")
+        when (decision) {
+            VideoSessionPolicy.Decision.END -> _endVideoPlayback(reason)
+            VideoSessionPolicy.Decision.KEEP -> Unit
+            VideoSessionPolicy.Decision.HOLD -> {
+                // Diagnostic/UI state only. A transport close must not alter play intent.
+                _videoSessionHeld.value = true
+            }
+        }
+    }
+
+    private fun _endVideoPlayback(reason: Reason) {
         if (!_videoPlaybackActive.value) return
         _localVideoPauseAtMs = null
-        // lingering polls after a stop must not bounce the UI back to a pending session
+        _clearVideoHold()
+        // Lingering polls after a stop must not bounce the UI back to pending.
         _videoPollSuppressed = true
         _videoPlaybackActive.value = false
-        airPlayVideoPlayer.stop()
+        _videoLocation.value = null
+        // A new /play already cleared native's sentinel: do not reintroduce it here.
+        airPlayVideoPlayer.stop(reportStopped = reason != Reason.NEW_PLAY)
         if (!_audioOnly.value) mediaSession?.isActive = false
-        log(message)
     }
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -624,47 +670,66 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         videoRenderer.feedFrame(data, ntpTimeNs, isH265)
     }
 
-    override fun onVideoSessionPoll() {
+    private fun _postServerCallback(action: () -> Unit) {
+        val token = _serverCallbacks.token()
+        _mainHandler.post {
+            if (_serverCallbacks.isCurrent(token) && _serverState.value == ServerState.RUNNING) action()
+        }
+    }
+
+    override fun onVideoSessionPoll() = _postServerCallback {
         _lastVideoPollAt = SystemClock.elapsedRealtime()
     }
 
-    override fun onVideoPlay(location: String, startPositionSeconds: Float) {
-        _localVideoPauseAtMs = null
-        _videoLocation.value = location
-        _videoPlaySeq.value++
-        _videoPollSuppressed = false
-        _videoPlaybackInfo.value = VideoPlaybackInfo(positionMs = (startPositionSeconds * 1000).toLong())
-        _videoPlaybackAspect.value = 16f / 9f
-        _videoPlaybackSize.value = null
-        _videoTitle.value = ""
-        _videoPlaybackActive.value = true
-        airPlayVideoPlayer.play(location, startPositionSeconds)
-        // claim media-button routing for keys that arrive as media-session events
-        mediaSession?.isActive = true
-        log("AirPlay Video play: ${LogSanitizer.mediaLocation(location)} @ ${startPositionSeconds}s")
+    override fun onVideoPlay(location: String, startPositionSeconds: Float, generation: Long) {
+        _postServerCallback {
+            // URL equality is not session identity. Each /play gets a fresh player.
+            _decideVideoSession(Reason.NEW_PLAY)
+            _videoGeneration = generation
+            _localVideoPauseAtMs = null
+            _videoLocation.value = location
+            _videoPlaySeq.value++
+            _videoPollSuppressed = false
+            _videoPlaybackInfo.value = VideoPlaybackInfo(positionMs = (startPositionSeconds * 1000).toLong(), buffering = true)
+            _videoPlaybackAspect.value = 16f / 9f
+            _videoPlaybackSize.value = null
+            _videoTitle.value = ""
+            _lastVideoStateRate = -1f
+            _videoPlaybackActive.value = true
+            _sessionLog("NEW_PLAY")
+            airPlayVideoPlayer.play(location, startPositionSeconds)
+            mediaSession?.isActive = true
+        }
     }
 
-    override fun onVideoScrub(positionSeconds: Float) {
+    private fun _postVideoCommand(generation: Long, action: () -> Unit) {
+        _postServerCallback {
+            if (_videoPlaybackActive.value && generation == _videoGeneration) action()
+        }
+    }
+
+    override fun onVideoScrub(positionSeconds: Float, generation: Long) = _postVideoCommand(generation) {
         airPlayVideoPlayer.scrub(positionSeconds)
     }
 
-    override fun onVideoRate(rate: Float) {
+    override fun onVideoRate(rate: Float, generation: Long) = _postVideoCommand(generation) {
+        _sessionLog(if (rate > 0f) "SENDER_RESUME" else "SENDER_PAUSE")
+        // A sender pause must not acquire/extend the receiver-local stop grace.
+        _localVideoPauseAtMs = VideoStopPolicy.afterSenderRate(_localVideoPauseAtMs, rate)
+        if (rate > 0f) _clearVideoHold()
         airPlayVideoPlayer.setRate(rate)
     }
 
-    override fun onVideoStop() {
-        val now = SystemClock.elapsedRealtime()
-        if (VideoStopPolicy.shouldIgnoreRemoteStop(
-                localPauseAtMs = _localVideoPauseAtMs,
-                nowMs = now,
-                playerIsPaused = !_videoPlaybackInfo.value.playing,
-                graceMs = LOCAL_PAUSE_REMOTE_STOP_GRACE_MS,
-            )
-        ) {
-            log("Ignored AirPlay stop after local pause")
-            return
-        }
-        _endVideoPlayback("AirPlay Video stopped")
+    override fun onVideoStop(generation: Long) = _postVideoCommand(generation) {
+        _decideVideoSession(Reason.SENDER_STOP)
+    }
+
+    override fun onVideoConnectionClosed(generation: Long) = _postVideoCommand(generation) {
+        _decideVideoSession(Reason.PLAY_CONNECTION_CLOSED)
+    }
+
+    override fun onVideoReset(endOfStream: Boolean, generation: Long) = _postVideoCommand(generation) {
+        _decideVideoSession(if (endOfStream) Reason.NATIVE_HLS_EOS else Reason.NATIVE_HLS_SHUTDOWN)
     }
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
@@ -747,6 +812,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onConnectionInit() {
+        _postServerCallback { _onConnectionInit() }
+    }
+
+    private fun _onConnectionInit() {
         val firstConnection = _connectionCount.value == 0
         _connectionCount.value++
         log("Client connected (${_connectionCount.value})")
@@ -759,15 +828,19 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onConnectionDestroy() {
+        _postServerCallback { _onConnectionDestroy() }
+    }
+
+    private fun _onConnectionDestroy() {
         _connectionCount.value = (_connectionCount.value - 1).coerceAtLeast(0)
         if (_connectionCount.value == 0) {
-            // clients may drop without POST /stop; must run before the poll-state reset
-            _endVideoPlayback("AirPlay Video stopped (disconnect)")
+            // This includes localhost HLS fetches: never treat it as sender ownership.
+            _decideVideoSession(Reason.ALL_CLIENTS_GONE)
             // last client gone: release audio output devices to save power
             audioRenderer.stop()
             _audioOnly.value = false
             _lastVideoPollAt = 0
-            _videoPollSuppressed = false
+            // Do not clear explicit-stop suppression on transport churn.
             _coverArtBytes = null
             _trackInfo.value = TrackInfo()
             _positionMs.value = 0
@@ -781,7 +854,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                     _preZeroIdx = -1
                 }
             }
-            mediaSession?.isActive = false
+            if (!_videoPlaybackActive.value) mediaSession?.isActive = false
             _refreshDacpPlayer()
             _updateMediaNotification()
         }
@@ -858,7 +931,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             mediaSession?.isActive = true
             log("Audio mode")
         } else if (!audioOnly && prev) {
-            mediaSession?.isActive = false
+            if (!_videoPlaybackActive.value) mediaSession?.isActive = false
             _coverArtBytes = null
             _trackInfo.value = TrackInfo()
             _positionMs.value = 0
@@ -881,6 +954,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     fun togglePlayPause() {
+        if (_videoPlaybackActive.value) {
+            setVideoPlaying(!_videoPlaybackInfo.value.playing)
+            return
+        }
         val nowPlaying = !_playing.value
         _setPlaying(nowPlaying)
         dacpController?.let { if (nowPlaying) it.play() else it.pause() }

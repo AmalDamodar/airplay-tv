@@ -26,7 +26,7 @@ object NativeBridge {
     external fun nativeSetLang(handle: Long, requested: String, subtitles: String, system: String)
     external fun nativeSetAudioEnabled(handle: Long, enabled: Boolean)
     external fun nativeUpdatePlaybackInfo(
-        handle: Long, position: Float, duration: Float, rate: Float, readyToPlay: Boolean
+        handle: Long, generation: Long, position: Float, duration: Float, rate: Float, readyToPlay: Boolean, buffering: Boolean
     )
 
     external fun nativeGetRaopTxtRecords(handle: Long): Map<String, String>?

@@ -17,10 +17,12 @@ interface RaopCallbackHandler {
     fun onDacpId(dacpId: String, activeRemote: String)
     fun onMirrorRunning(running: Boolean)
     // video (hls), distinct from mirroring and raop audio
-    fun onVideoPlay(location: String, startPositionSeconds: Float)
-    fun onVideoScrub(positionSeconds: Float)
-    fun onVideoRate(rate: Float)
-    fun onVideoStop()
+    fun onVideoPlay(location: String, startPositionSeconds: Float, generation: Long)
+    fun onVideoScrub(positionSeconds: Float, generation: Long)
+    fun onVideoRate(rate: Float, generation: Long)
+    fun onVideoStop(generation: Long)
+    fun onVideoConnectionClosed(generation: Long)
+    fun onVideoReset(endOfStream: Boolean, generation: Long)
     // fired per sender GET /playback-info poll; polling starts before /play
     fun onVideoSessionPoll()
 }

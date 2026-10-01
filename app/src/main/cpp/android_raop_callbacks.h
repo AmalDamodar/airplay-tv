@@ -33,6 +33,8 @@ typedef struct {
     jmethodID on_video_scrub;
     jmethodID on_video_rate;
     jmethodID on_video_stop;
+    jmethodID on_video_connection_closed;
+    jmethodID on_video_reset;
     jmethodID on_video_session_poll;
     int h265_enabled;
     int require_pin;
@@ -44,18 +46,17 @@ typedef struct {
     double playback_duration;
     float playback_rate;
     int playback_ready;
-    /* holds the /play response until the player is ready, so self-driven senders (macOS)
-       establish their timeline after the real duration is known, not at duration 0 */
-    pthread_cond_t play_ready_cond;
-    int play_ready;
+    int playback_buffering;
+    /* A queued snapshot from the previous player cannot finish a new /play. */
+    jlong playback_generation;
     AudioEngine *audio_engine;
 } android_callback_ctx_t;
 
 void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject callback_obj);
 void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env);
 void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx);
-void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double position,
-                                             double duration, float rate, int ready);
+void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, jlong generation, double position,
+                                             double duration, float rate, int ready, int buffering);
 
 #ifdef __cplusplus
 }

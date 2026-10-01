@@ -224,6 +224,9 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
     private val _videoPlaybackActive = MutableStateFlow(false)
     val videoPlaybackActive: StateFlow<Boolean> = _videoPlaybackActive.asStateFlow()
 
+    private val _videoSessionHeld = MutableStateFlow(false)
+    val videoSessionHeld: StateFlow<Boolean> = _videoSessionHeld.asStateFlow()
+
     // video channel polling but /play not received yet
     private val _videoSessionPending = MutableStateFlow(false)
     val videoSessionPending: StateFlow<Boolean> = _videoSessionPending.asStateFlow()
@@ -578,6 +581,7 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
                 _videoScrubPositionMs.value = null
             }
             _videoPlaybackActive.value = videoActive
+            _videoSessionHeld.value = it.videoSessionHeld.value
             _videoSessionPending.value = it.videoSessionPending()
             _videoDownloadProgress.value = it.videoDownloader.progress.value
             if (videoActive) {

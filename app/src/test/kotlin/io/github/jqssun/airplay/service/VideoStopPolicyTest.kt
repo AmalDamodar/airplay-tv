@@ -1,10 +1,17 @@
 package io.github.jqssun.airplay.service
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VideoStopPolicyTest {
+    @Test fun `sender pause echo preserves but does not grant local grace`() {
+        assertEquals(100L, VideoStopPolicy.afterSenderRate(100L, 0f))
+        org.junit.Assert.assertNull(VideoStopPolicy.afterSenderRate(null, 0f))
+        org.junit.Assert.assertNull(VideoStopPolicy.afterSenderRate(100L, 1f))
+    }
+
 
     @Test
     fun `immediate remote stop after local pause is ignored`() {
