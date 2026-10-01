@@ -39,6 +39,7 @@ import io.github.jqssun.airplay.audio.DacpController
 import io.github.jqssun.airplay.audio.DacpPlayer
 import io.github.jqssun.airplay.audio.DmapParser
 import io.github.jqssun.airplay.audio.TrackInfo
+import io.github.jqssun.airplay.audio.VolumeBroadcast
 import io.github.jqssun.airplay.bridge.LogListener
 import io.github.jqssun.airplay.bridge.NativeBridge
 import io.github.jqssun.airplay.bridge.RaopCallbackHandler
@@ -51,6 +52,7 @@ import io.github.jqssun.airplay.viewmodel.DebugInfo
 import java.net.NetworkInterface
 import java.security.SecureRandom
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
@@ -73,8 +75,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     private var foregroundStarted = false
     private var lastOrientation = Configuration.ORIENTATION_UNDEFINED
 
-    val videoRenderer = VideoRenderer()
+    val videoRenderer = VideoRenderer(this)
     val audioRenderer = AudioRenderer()
+    private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val airPlayVideoPlayer by lazy { AirPlayVideoPlayer(this) }
     val videoDownloader by lazy { VideoDownloader(this) }
 
@@ -133,7 +136,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             !_videoPollSuppressed &&
             SystemClock.elapsedRealtime() - _lastVideoPollAt < VIDEO_POLL_PENDING_TIMEOUT_MS
 
-    // set once mirroring reports a real size; connectionCount can't tell session kinds apart
+    // set once mirroring reports a real size; stops with session
     private val _mirroringActive = MutableStateFlow(false)
     val mirroringActive = _mirroringActive.asStateFlow()
 
@@ -166,9 +169,18 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     @Volatile private var _coverArtBytes: ByteArray? = null
     private var mediaSession: MediaSessionCompat? = null
     private var mediaReceiver: BroadcastReceiver? = null
+    private var volumeReceiver: BroadcastReceiver? = null
+    private var _pendingVolEchoes = 0
+    // senders park volume at -30 as route closes; session must not leave device silenced
+    private var _preZeroIdx = -1
+    @Volatile private var _senderFrac = -1f
+    private var _volSyncTarget = -1f
+    private var _volSyncHint = 0
+    private var _volSyncDir = 0
+    private var _volSyncSteps = 0
+    private val _volSyncTimeout = Runnable { _volSyncEnd() }
 
     var logCallback: ((String) -> Unit)? = null
-    var modeCallback: ((Boolean) -> Unit)? = null
 
     @Volatile private var _lastPin: String? = null
     var pinCallback: ((String?) -> Unit)? = null
@@ -270,6 +282,28 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         }
         ContextCompat.registerReceiver(this, mediaReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
+        volumeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.getIntExtra(VolumeBroadcast.EXTRA_STREAM_TYPE, -1) != AudioManager.STREAM_MUSIC) return
+                val idx = intent.getIntExtra(VolumeBroadcast.EXTRA_VALUE, -1)
+                val prev = intent.getIntExtra(VolumeBroadcast.EXTRA_PREV_VALUE, -1)
+                if (idx < 0 || prev < 0 || idx == prev) return
+                if (_pendingVolEchoes > 0) { _pendingVolEchoes--; return }
+                if (_connectionCount.value == 0) return
+                val target = idx.toFloat() / audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                Log.d(TAG, "local volume $prev -> $idx, sync sender to $target")
+                _preZeroIdx = -1
+                val active = _volSyncTarget >= 0f
+                _volSyncTarget = target
+                _volSyncHint = if (idx > prev) 1 else -1
+                _volSyncDir = 0
+                _volSyncSteps = 0
+                if (!active) _volSyncStep()
+            }
+        }
+        ContextCompat.registerReceiver(this, volumeReceiver, IntentFilter(VolumeBroadcast.ACTION),
+            ContextCompat.RECEIVER_NOT_EXPORTED)
+
         airPlayVideoPlayer.onVideoSize = { width, height, aspect ->
             _videoPlaybackAspect.value = aspect
             _videoPlaybackSize.value = width to height
@@ -345,10 +379,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         // rate / burst size itself; feed it AudioManager values so low-latency buffer
         // sizing works there
         // see: https://github.com/google/oboe/blob/main/docs/GettingStarted.md#obtaining-optimal-latency
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         NativeBridge.nativeSetDefaultStreamValues(
-            am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
-            am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
+            audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
+            audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0
         )
         nativeHandle = NativeBridge.nativeInit(this, hwAddr, effectiveName, keyFile, nohold, requirePin)
         if (nativeHandle == 0L) {
@@ -362,17 +395,16 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val maxFps = prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)
         val overscanned = prefs.getBoolean(Prefs.OVERSCANNED, Prefs.DEF_OVERSCANNED)
         val audioLatencyMs = prefs.getInt(Prefs.AUDIO_LATENCY_MS, Prefs.DEF_AUDIO_LATENCY_MS)
-        val h265 = _h265()
+        val (reqW, reqH) = _displaySize(clamp = false)
+        val h265 = videoRenderer.selectDecoders(reqW, reqH, maxFps, prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED))
         val alac = prefs.getBoolean(Prefs.ALAC_ENABLED, Prefs.DEF_ALAC_ENABLED)
         val aac = prefs.getBoolean(Prefs.AAC_ENABLED, Prefs.DEF_AAC_ENABLED)
 
-        val realtimePriority = prefs.getBoolean(Prefs.KEY_PRIORITY, Prefs.DEF_KEY_PRIORITY)
-        val lowLatency = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         videoRenderer.enforceSdr = prefs.getBoolean(Prefs.ENFORCE_SDR, Prefs.DEF_ENFORCE_SDR)
         videoRenderer.keyAllowFrameDrop = prefs.getBoolean(Prefs.KEY_ALLOW_FRAME_DROP, Prefs.DEF_KEY_ALLOW_FRAME_DROP)
-        videoRenderer.realtimeDecoderPriority = realtimePriority
-        videoRenderer.lowLatency = lowLatency
-        videoRenderer.operatingRateHint = prefs.getBoolean(Prefs.KEY_OPERATING_RATE, Prefs.DEF_KEY_OPERATING_RATE)
+        videoRenderer.selector.maxOperatingRate = when (prefs.getString(Prefs.OPERATING_RATE, Prefs.DEF_OPERATING_RATE)) {
+            Prefs.ON -> true; Prefs.OFF -> false; else -> null
+        }
         videoRenderer.benchmarkLog = prefs.getBoolean(Prefs.BENCHMARK_LOG, Prefs.DEF_BENCHMARK_LOG)
         videoRenderer.benchmarkLogCallback = { msg -> logCallback?.invoke(msg) }
         videoRenderer.scheduledOutputBufferRelease = prefs.getBoolean(Prefs.SCHEDULED_OUTPUT_BUFFER_RELEASE, Prefs.DEF_SCHEDULED_OUTPUT_BUFFER_RELEASE)
@@ -381,6 +413,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val advertiseVideo = prefs.getBoolean(Prefs.ADVERTISE_VIDEO, Prefs.DEF_ADVERTISE_VIDEO)
         val advertiseAudio = prefs.getBoolean(Prefs.ADVERTISE_AUDIO, Prefs.DEF_ADVERTISE_AUDIO)
         NativeBridge.nativeSetHlsEnabled(nativeHandle, advertiseVideo)
+        NativeBridge.nativeSetLang(nativeHandle, "", "", resources.configuration.locales.toLanguageTags().replace(',', ':'))
         NativeBridge.nativeSetAudioEnabled(nativeHandle, advertiseAudio)
         NativeBridge.nativeSetPlist(nativeHandle, "maxFPS", maxFps)
         NativeBridge.nativeSetPlist(nativeHandle, "overscanned", if (overscanned) 1 else 0)
@@ -423,30 +456,25 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         log("Server started on port $port")
     }
 
-    private fun _h265(): Boolean =
-        prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED) && VideoRenderer.supportsH265()
-
     private fun _orientationFollowsDevice(): Boolean =
-        prefs.getBoolean(Prefs.AUTO_RES, Prefs.DEF_AUTO_RES) ||
-            prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) == "auto"
+        prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) == Prefs.AUTO
 
-    private fun _displaySize(): Pair<Int, Int> {
-        val autoRes = prefs.getBoolean(Prefs.AUTO_RES, Prefs.DEF_AUTO_RES)
-        val res = if (autoRes) "auto" else prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION)!!
+    private fun _displaySize(clamp: Boolean = true): Pair<Int, Int> {
+        val res = prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION)!!
+        val portrait = when (res) {
+            "portrait" -> true
+            "landscape" -> false
+            else -> resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        }
+        val (rawW, rawH) = realDisplaySize()
+        val device = if (portrait != rawH >= rawW) rawH to rawW else rawW to rawH
+        if (res == "portrait" || res == "landscape") return device
         val (w, h) = if (res.contains("x")) {
             res.split("x").let { it[0].toInt() to it[1].toInt() }
-        } else {
-            val (rawW, rawH) = if (autoRes) realDisplaySize()
-                else resources.displayMetrics.let { it.widthPixels to it.heightPixels }
-            val portrait = when (res) {
-                "portrait" -> true
-                "landscape" -> false
-                else -> resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-            }
-            if (portrait != rawH >= rawW) rawH to rawW else rawW to rawH
-        }
+        } else device
+        if (!clamp) return w to h
         // strict decoders black-screen past their limits; advertised size is only upper bound for senders
-        val (maxW, maxH) = VideoRenderer.maxSupportedResolution(_h265())
+        val (maxW, maxH) = videoRenderer.maxResolution()
         return w.coerceAtMost(maxW) to h.coerceAtMost(maxH)
     }
 
@@ -579,6 +607,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             try { unregisterReceiver(it) } catch (_: Exception) {}
         }
         mediaReceiver = null
+        volumeReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        volumeReceiver = null
         dacpController?.release()
         dacpController = null
         mediaSession?.release()
@@ -639,9 +671,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         clearPin()
         audioRenderer.start()
         audioRenderer.setFormat(ct, spf)
+        if (!usingScreen) _setPlaying(true)
         if (!usingScreen && !_audioOnly.value) {
             // pure music streaming (not screen mirroring audio)
-            onAudioOnly(true)
+            _setAudioOnly(true)
         }
         log("Audio format: ct=$ct spf=$spf screen=$usingScreen")
     }
@@ -658,7 +691,59 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onVolumeChange(volume: Float) {
-        audioRenderer.setVolume(volume)
+        val frac = if (volume <= -144f) 0f else ((volume + 30f) / 30f).coerceIn(0f, 1f)
+        _senderFrac = frac
+        Log.d(TAG, "volume ${volume}dB, frac $frac")
+        _mainHandler.post {
+            if (_volSyncTarget >= 0f) {
+                _volSyncStep()
+                return@post
+            }
+            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val idx = (frac * max).roundToInt()
+            _preZeroIdx = if (idx == 0) (if (_preZeroIdx < 0) cur else _preZeroIdx) else -1
+            if (idx != cur) {
+                _pendingVolEchoes++
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, idx, 0)
+            }
+        }
+    }
+
+    override fun onClientVolume(): Float {
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val vol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val db = if (vol == 0) -144f else -30f + 30f * vol / max
+        Log.d(TAG, "client volume query: $vol/$max -> ${db}dB")
+        return db
+    }
+
+    private fun _volSyncStep() {
+        _mainHandler.removeCallbacks(_volSyncTimeout)
+        val target = _volSyncTarget
+        if (target < 0f) return
+        val frac = _senderFrac
+        val want = when {
+            frac < 0f -> _volSyncHint
+            abs(target - frac) <= VOL_SYNC_EPS -> 0
+            target > frac -> 1
+            else -> -1
+        }
+        if (want == 0 || (_volSyncDir != 0 && want != _volSyncDir) || _volSyncSteps >= VOL_SYNC_MAX_STEPS) {
+            _volSyncEnd()
+            return
+        }
+        _volSyncDir = want
+        _volSyncSteps++
+        if (want > 0) dacpController?.volumeUp() else dacpController?.volumeDown()
+        _mainHandler.postDelayed(_volSyncTimeout, VOL_SYNC_TIMEOUT_MS)
+    }
+
+    private fun _volSyncEnd() {
+        _mainHandler.removeCallbacks(_volSyncTimeout)
+        if (_volSyncTarget >= 0f) Log.d(TAG, "volume sync done: sender $_senderFrac, target $_volSyncTarget")
+        _volSyncTarget = -1f
+        _volSyncDir = 0
     }
 
     override fun onConnectionInit() {
@@ -681,7 +766,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             // last client gone: release audio output devices to save power
             audioRenderer.stop()
             _audioOnly.value = false
-            _mirroringActive.value = false
             _lastVideoPollAt = 0
             _videoPollSuppressed = false
             _coverArtBytes = null
@@ -689,8 +773,17 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             _positionMs.value = 0
             _durationMs.value = 0
             dacpController?.reset()
+            _senderFrac = -1f
+            _mainHandler.post {
+                _volSyncEnd()
+                if (_preZeroIdx >= 0) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, _preZeroIdx, 0)
+                    _preZeroIdx = -1
+                }
+            }
             mediaSession?.isActive = false
             _refreshDacpPlayer()
+            _updateMediaNotification()
         }
         log("Client disconnected (${_connectionCount.value})")
     }
@@ -740,18 +833,29 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _refreshDacpPlayer()
     }
 
+    override fun onAudioTeardown() {
+        _setPlaying(false)
+    }
+
     override fun onDacpId(dacpId: String, activeRemote: String) {
         dacpController?.update(dacpId, activeRemote)
         log("DACP: $dacpId")
     }
 
-    override fun onAudioOnly(audioOnly: Boolean) {
+    override fun onMirrorRunning(running: Boolean) {
+        if (running) videoRenderer.startSession() else {
+            videoRenderer.stopSession()
+            _mirroringActive.value = false
+        }
+        _setAudioOnly(!running)
+    }
+
+    private fun _setAudioOnly(audioOnly: Boolean) {
         val prev = _audioOnly.value
         _audioOnly.value = audioOnly
         _refreshDacpPlayer()
         if (audioOnly && !prev) {
             mediaSession?.isActive = true
-            modeCallback?.invoke(true)
             log("Audio mode")
         } else if (!audioOnly && prev) {
             mediaSession?.isActive = false
@@ -759,7 +863,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             _trackInfo.value = TrackInfo()
             _positionMs.value = 0
             _durationMs.value = 0
-            modeCallback?.invoke(false)
+            _updateMediaNotification()
             log("Mirror mode")
         }
     }
@@ -871,7 +975,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         droppedFrames = videoRenderer.droppedFrames,
         framePacingJitterUs = videoRenderer.framePacingJitterUs,
         audioCodec = audioRenderer.codecLabel,
-        audioVolume = (audioRenderer.volume * 100).toInt(),
+        audioVolume = 100 * audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) /
+            audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
         audio = audioRenderer.audioDebug(),
         connections = _connectionCount.value,
     )
@@ -1036,6 +1141,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     companion object {
         private const val TAG = "AirPlayService"
+        private const val VOL_SYNC_EPS = 0.033f
+        private const val VOL_SYNC_MAX_STEPS = 32
+        private const val VOL_SYNC_TIMEOUT_MS = 800L
         private const val CHANNEL_ID = "airplay_service"
         private const val NOTIFICATION_ID = 1
         const val ACTION_PLAY_PAUSE = "io.github.jqssun.airplay.PLAY_PAUSE"

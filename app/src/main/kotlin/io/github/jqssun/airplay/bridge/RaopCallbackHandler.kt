@@ -5,6 +5,8 @@ interface RaopCallbackHandler {
     fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean)
     fun onVideoSize(srcW: Float, srcH: Float, w: Float, h: Float)
     fun onVolumeChange(volume: Float)
+    fun onClientVolume(): Float
+    fun onAudioTeardown()
     fun onConnectionInit()
     fun onConnectionDestroy()
     fun onConnectionReset(reason: Int)
@@ -13,7 +15,7 @@ interface RaopCallbackHandler {
     fun onCoverArt(data: ByteArray)
     fun onProgress(start: Long, curr: Long, end: Long)
     fun onDacpId(dacpId: String, activeRemote: String)
-    fun onAudioOnly(audioOnly: Boolean)
+    fun onMirrorRunning(running: Boolean)
     // video (hls), distinct from mirroring and raop audio
     fun onVideoPlay(location: String, startPositionSeconds: Float)
     fun onVideoScrub(positionSeconds: Float)

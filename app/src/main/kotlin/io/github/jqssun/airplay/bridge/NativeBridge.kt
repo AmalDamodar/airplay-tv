@@ -23,6 +23,7 @@ object NativeBridge {
     external fun nativeSetH265Enabled(handle: Long, enabled: Boolean)
     external fun nativeSetCodecs(handle: Long, alac: Boolean, aac: Boolean)
     external fun nativeSetHlsEnabled(handle: Long, enabled: Boolean)
+    external fun nativeSetLang(handle: Long, requested: String, subtitles: String, system: String)
     external fun nativeSetAudioEnabled(handle: Long, enabled: Boolean)
     external fun nativeUpdatePlaybackInfo(
         handle: Long, position: Float, duration: Float, rate: Float, readyToPlay: Boolean
@@ -40,7 +41,6 @@ object NativeBridge {
                                             benchmarkLog: Boolean): Boolean
     external fun nativeServerAudioStart(handle: Long): Boolean
     external fun nativeServerAudioStop(handle: Long)
-    external fun nativeServerAudioSetVolume(handle: Long, volume: Float)
     external fun nativeServerAudioFormat(handle: Long, ct: Int, spf: Int)
     // fills direct buffer with packed debug snapshot; false if audio isn't running
     external fun nativeServerAudioDebug(handle: Long, buf: java.nio.ByteBuffer): Boolean

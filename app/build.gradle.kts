@@ -34,8 +34,8 @@ android {
         applicationId = "no.gior.shieldairplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 110
-        versionName = "1.1.0-shield"
+        versionCode = 200
+        versionName = "2.0.0-shield"
 
         externalNativeBuild {
             cmake {
@@ -108,7 +108,7 @@ tasks.register("applyUxplayPatches") {
         val touched = patches.flatMap { git("apply", "--numstat", it.path).trim().lines() }
             .map { it.substringAfterLast("\t") }.distinct()
         git("checkout", "--", *touched.toTypedArray())
-        patches.forEach { git("apply", it.path) }
+        patches.forEach { git("apply", "--unidiff-zero", it.path) }
     }
 }
 

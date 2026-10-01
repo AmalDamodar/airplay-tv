@@ -3,6 +3,7 @@ package io.github.jqssun.airplay.viewmodel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.SystemClock
 import android.view.Surface
 import androidx.core.content.FileProvider
@@ -73,11 +74,16 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
 
     private val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
     private val logFile = File(app.filesDir, "airplay_logs.txt")
+    private val audioManager = app.getSystemService(AudioManager::class.java)
     private var service: AirPlayService? = null
     val dacpPlayer: Player? get() = service?.dacpPlayer
 
-    fun audioVolumeUp() { service?.dacpController?.volumeUp() }
-    fun audioVolumeDown() { service?.dacpController?.volumeDown() }
+    fun audioVolumeUp() {
+        audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, 0)
+    }
+    fun audioVolumeDown() {
+        audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, 0)
+    }
     fun audioScanBegin(forward: Boolean) {
         service?.dacpController?.let { if (forward) it.beginFastForward() else it.beginRewind() }
     }
@@ -130,8 +136,8 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
     private val _lowLatency = MutableStateFlow(prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY))
     val lowLatency: StateFlow<Boolean> = _lowLatency.asStateFlow()
 
-    private val _operatingRateHint = MutableStateFlow(prefs.getBoolean(Prefs.KEY_OPERATING_RATE, Prefs.DEF_KEY_OPERATING_RATE))
-    val operatingRateHint: StateFlow<Boolean> = _operatingRateHint.asStateFlow()
+    private val _operatingRate = MutableStateFlow(prefs.getString(Prefs.OPERATING_RATE, Prefs.DEF_OPERATING_RATE)!!)
+    val operatingRate: StateFlow<String> = _operatingRate.asStateFlow()
 
     private val _scheduledOutputBufferRelease = MutableStateFlow(prefs.getBoolean(Prefs.SCHEDULED_OUTPUT_BUFFER_RELEASE, Prefs.DEF_SCHEDULED_OUTPUT_BUFFER_RELEASE))
     val scheduledOutputBufferRelease: StateFlow<Boolean> = _scheduledOutputBufferRelease.asStateFlow()
@@ -150,9 +156,6 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
 
     private val _resolution = MutableStateFlow(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION)!!)
     val resolution: StateFlow<String> = _resolution.asStateFlow()
-
-    private val _autoRes = MutableStateFlow(prefs.getBoolean(Prefs.AUTO_RES, Prefs.DEF_AUTO_RES))
-    val autoRes: StateFlow<Boolean> = _autoRes.asStateFlow()
 
     private val _maxFps = MutableStateFlow(prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
     val maxFps: StateFlow<Int> = _maxFps.asStateFlow()
@@ -383,11 +386,7 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
         _lowLatency.value = v
         prefs.edit().putBoolean(Prefs.LOW_LATENCY, v).apply()
     }
-    fun setOperatingRateHint(v: Boolean) {
-        _operatingRateHint.value = v
-        prefs.edit().putBoolean(Prefs.KEY_OPERATING_RATE, v).apply()
-        _applyByServerRestart()
-    }
+    fun setOperatingRate(v: String) { _operatingRate.value = v; prefs.edit().putString(Prefs.OPERATING_RATE, v).apply(); _applyByServerRestart() }
     fun setScheduledOutputBufferRelease(v: Boolean) {
         _scheduledOutputBufferRelease.value = v
         prefs.edit().putBoolean(Prefs.SCHEDULED_OUTPUT_BUFFER_RELEASE, v).apply()
@@ -402,7 +401,6 @@ class MainViewModel @Inject constructor(app: Application) : AndroidViewModel(app
     fun setAlacEnabled(v: Boolean) { _alacEnabled.value = v; prefs.edit().putBoolean(Prefs.ALAC_ENABLED, v).apply(); _applyByServerRestart() }
     fun setAacEnabled(v: Boolean) { _aacEnabled.value = v; prefs.edit().putBoolean(Prefs.AAC_ENABLED, v).apply(); _applyByServerRestart() }
     fun setResolution(v: String) { _resolution.value = v; prefs.edit().putString(Prefs.RESOLUTION, v).apply(); _applyByServerRestart() }
-    fun setAutoRes(v: Boolean) { _autoRes.value = v; prefs.edit().putBoolean(Prefs.AUTO_RES, v).apply(); _applyByServerRestart() }
     fun setMaxFps(v: Int) { _maxFps.value = v; prefs.edit().putInt(Prefs.MAX_FPS, v).apply(); _applyByServerRestart() }
     fun setOverscanned(v: Boolean) { _overscanned.value = v; prefs.edit().putBoolean(Prefs.OVERSCANNED, v).apply(); _applyByServerRestart() }
     fun setRequirePin(v: Boolean) { _requirePin.value = v; prefs.edit().putBoolean(Prefs.REQUIRE_PIN, v).apply(); _applyByServerRestart() }

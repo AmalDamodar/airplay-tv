@@ -18,6 +18,8 @@ typedef struct {
     jmethodID on_audio_format;
     jmethodID on_video_size;
     jmethodID on_volume_change;
+    jmethodID on_client_volume;
+    jmethodID on_audio_teardown;
     jmethodID on_conn_init;
     jmethodID on_conn_destroy;
     jmethodID on_conn_reset;
@@ -26,7 +28,7 @@ typedef struct {
     jmethodID on_coverart;
     jmethodID on_progress;
     jmethodID on_dacp_id;
-    jmethodID on_audio_only;
+    jmethodID on_mirror_running;
     jmethodID on_video_play;
     jmethodID on_video_scrub;
     jmethodID on_video_rate;
