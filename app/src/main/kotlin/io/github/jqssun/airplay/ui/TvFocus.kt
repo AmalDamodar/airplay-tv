@@ -1,5 +1,7 @@
 package io.github.jqssun.airplay.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -10,6 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -27,8 +32,18 @@ fun Modifier.focusRing(
     width: Dp = 3.dp,
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.035f else 1f, tween(160), label = "focusScale")
+    val highlight by animateFloatAsState(if (focused) 0.14f else 0f, tween(160), label = "focusTint")
     return this
         .onFocusChanged { focused = it.hasFocus }
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        // Draw above opaque Material containers, not behind them. No extra focus target.
+        .drawWithContent {
+            drawContent()
+            if (highlight > 0f) {
+                drawOutline(shape.createOutline(size, layoutDirection, this), color.copy(alpha = highlight))
+            }
+        }
         .thenIf(focused) { border(width = width, color = color, shape = shape) }
 }
 

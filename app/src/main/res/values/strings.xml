@@ -26,6 +26,15 @@
     <string name="btn_start">Start</string>
     <string name="btn_stop">Stop</string>
     <string name="unknown_track">Unknown</string>
+    <string name="ready_label">Ready</string>
+    <string name="receiver_ready_title">Ready for AirPlay</string>
+    <string name="receiver_cast_help">Open Control Center → Screen Mirroring on your iPhone, or the AirPlay button in a video app. Choose %1$s.</string>
+    <string name="receiver_network_help">Connect both devices to the same Wi-Fi or local network.</string>
+    <string name="now_playing_label">Now playing</string>
+    <string name="settings_intro">Connection, playback and appearance</string>
+    <string name="logs_intro">Receiver activity and diagnostics</string>
+    <string name="logs_empty">No activity yet. Receiver events will appear here.</string>
+    <string name="time_separator">\u0020/\u0020</string>
 
     <!-- Content descriptions -->
     <string name="cd_pip">Picture-in-Picture</string>

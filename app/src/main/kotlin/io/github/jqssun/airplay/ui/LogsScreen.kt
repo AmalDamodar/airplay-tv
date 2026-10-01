@@ -1,8 +1,10 @@
 package io.github.jqssun.airplay.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -34,11 +36,14 @@ fun LogsScreen(viewModel: MainViewModel) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(R.string.tab_logs),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.tab_logs), style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    stringResource(R.string.logs_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             TextButton(onClick = { viewModel.exportLogs() }, modifier = Modifier.dpadFocus()) {
                 Text(stringResource(R.string.btn_export))
             }
@@ -47,18 +52,37 @@ fun LogsScreen(viewModel: MainViewModel) {
             }
         }
 
-        SelectionContainer {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp)
-            ) {
-                items(logs) { line ->
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+        ) {
+            if (logs.isEmpty()) {
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        stringResource(R.string.logs_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
+                }
+            }
+            SelectionContainer {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().padding(6.dp).dpadFocus().focusable(),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) {
+                    itemsIndexed(logs) { index, line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                                .background(if (index % 2 == 0) MaterialTheme.colorScheme.surface
+                                    else MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                        )
+                    }
                 }
             }
         }

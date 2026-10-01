@@ -6,13 +6,15 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn as AndroidxOptIn
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -321,7 +328,16 @@ fun MainScreen(
                 enter = androidx.compose.animation.fadeIn(),
                 exit = androidx.compose.animation.fadeOut()
             ) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.7f),
+                            0.3f to Color.Transparent,
+                            0.65f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.8f),
+                        )
+                    )
+                )
             }
             if (buffering) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).size(72.dp))
@@ -384,7 +400,8 @@ fun MainScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .safeDrawingPadding()
-                            .padding(top = 24.dp)
+                            .padding(horizontal = if (isTv()) 48.dp else 0.dp)
+                            .padding(top = if (isTv()) 27.dp else 24.dp)
                     ) {
                         UnlockButton(
                             onClick = {
@@ -510,33 +527,77 @@ fun MainScreen(
             onPip = onPip
         )
     } else {
+        val tv = isTv()
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                Column {
-                    AudioMiniController(
-                        viewModel,
-                        visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
-                        onClick = { tab = Tab.OVERVIEW }
-                    )
-                    NavigationBar {
-                        Tab.entries.forEach { t ->
-                            NavigationBarItem(
-                                selected = tab == t,
-                                onClick = { tab = t },
-                                icon = { Icon(t.icon, null) },
-                                label = { Text(stringResource(t.labelRes)) },
-                                modifier = Modifier.dpadFocus()
-                            )
+                if (!tv) {
+                    Column {
+                        AudioMiniController(
+                            viewModel,
+                            visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
+                            onClick = { tab = Tab.OVERVIEW }
+                        )
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                            Tab.entries.forEach { t ->
+                                NavigationBarItem(
+                                    selected = tab == t,
+                                    onClick = { tab = t },
+                                    icon = { Icon(t.icon, null) },
+                                    label = { Text(stringResource(t.labelRes)) },
+                                    modifier = Modifier.dpadFocus()
+                                )
+                            }
                         }
                     }
                 }
             }
         ) { padding ->
-            Box(modifier = Modifier.padding(padding)) {
-                TabContent(
-                    tab, viewModel, video,
-                    onFullscreen = { fullscreen = true }, onPip = onPip, showAudioMode = audioOnly
-                )
+            Row(
+                Modifier.fillMaxSize().padding(padding)
+                    .padding(horizontal = if (tv) 48.dp else 0.dp, vertical = if (tv) 27.dp else 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (tv) 24.dp else 0.dp),
+            ) {
+                if (tv) {
+                    NavigationRail(
+                        modifier = Modifier.fillMaxHeight().width(104.dp).clip(MaterialTheme.shapes.large),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        header = {
+                            Icon(
+                                Icons.Default.Cast, stringResource(R.string.app_name),
+                                Modifier.padding(vertical = 20.dp).size(32.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                    ) {
+                        Spacer(Modifier.height(16.dp))
+                        Tab.entries.forEach { t ->
+                            NavigationRailItem(
+                                selected = tab == t,
+                                onClick = { tab = t },
+                                icon = { Icon(t.icon, null) },
+                                label = { Text(stringResource(t.labelRes)) },
+                                modifier = Modifier.padding(vertical = 6.dp).dpadFocus(),
+                            )
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Box(Modifier.weight(1f)) {
+                        TabContent(
+                            tab, viewModel, video,
+                            onFullscreen = { fullscreen = true }, onPip = onPip, showAudioMode = audioOnly
+                        )
+                    }
+                    if (tv) {
+                        AudioMiniController(
+                            viewModel,
+                            visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
+                            onClick = { tab = Tab.OVERVIEW }
+                        )
+                    }
+                }
             }
         }
     }
@@ -610,9 +671,9 @@ private fun OverviewContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(16.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .padding(if (tv) 0.dp else 16.dp)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
             val connecting = state == ServerState.RUNNING && connections > 0 &&
@@ -624,24 +685,7 @@ private fun OverviewContent(
                     video()
                 }
                 if (state != ServerState.RUNNING || connections == 0) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = if (connections > 0) Icons.Default.CastConnected else Icons.Default.Cast,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = when (state) {
-                                ServerState.STOPPED -> stringResource(R.string.server_stopped)
-                                ServerState.RUNNING -> stringResource(R.string.waiting_for_connection)
-                                ServerState.ERROR -> stringResource(R.string.error_starting_server)
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
+                    ReceiverHero(name = serverName, state = state)
                 } else if (connecting) {
                     Text(
                         text = stringResource(R.string.waiting_for_playback),
@@ -650,17 +694,20 @@ private fun OverviewContent(
                     )
                 }
                 if (state == ServerState.RUNNING && mirroringActive) {
-                    Row(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    Row(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                            .background(Color.Black.copy(alpha = 0.65f), CircleShape).padding(4.dp)
+                    ) {
                         IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                             Icon(
                                 painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                tint = Color.White
                             )
                         }
                         IconButton(onClick = onFullscreen, modifier = Modifier.dpadFocus()) {
                             Icon(
                                 Icons.Default.Fullscreen, contentDescription = stringResource(R.string.cd_fullscreen),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                tint = Color.White
                             )
                         }
                     }
@@ -691,59 +738,49 @@ private fun OverviewContent(
             }
         }
 
-        // controls
+        // Keep the server action outside the scrolling content and its initial TV focus.
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = if (tv) 0.dp else 16.dp, vertical = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = MaterialTheme.shapes.large,
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = serverName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    ReceiverStatus(state, connections)
+                }
+                Button(
+                    onClick = {
+                        if (state == ServerState.RUNNING) viewModel.stopServer()
+                        else viewModel.startServer()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.primary,
+                        contentColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.onSecondaryContainer
+                            else MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus().focusRequester(startFocus)
                 ) {
-                    Column {
-                        Text(
-                            text = serverName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        val statusColor by animateColorAsState(
-                            when (state) {
-                                ServerState.RUNNING -> MaterialTheme.colorScheme.primary
-                                ServerState.ERROR -> MaterialTheme.colorScheme.error
-                                ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }, label = "status"
-                        )
-                        Text(
-                            text = when (state) {
-                                ServerState.RUNNING -> stringResource(R.string.connected_count, connections)
-                                ServerState.ERROR -> stringResource(R.string.error_label)
-                                ServerState.STOPPED -> stringResource(R.string.stopped_label)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = statusColor
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = {
-                            if (state == ServerState.RUNNING) viewModel.stopServer()
-                            else viewModel.startServer()
-                        },
-                        modifier = Modifier.dpadFocus().focusRequester(startFocus)
-                    ) {
-                        Icon(
-                            imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (state == ServerState.RUNNING) stringResource(R.string.btn_stop) else stringResource(R.string.btn_start))
-                    }
+                    Icon(
+                        imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (state == ServerState.RUNNING) stringResource(R.string.btn_stop) else stringResource(R.string.btn_start))
                 }
             }
         }
@@ -761,6 +798,11 @@ private fun FullscreenVideo(
     val debugEnabled by viewModel.debugEnabled.collectAsState()
     val debugInfo by viewModel.debugInfo.collectAsState()
 
+    val tv = isTv()
+    val rootFocusRequester = remember { FocusRequester() }
+    val exitFocusRequester = remember { FocusRequester() }
+    var isRootFocused by remember { mutableStateOf(false) }
+    var isExitFocused by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var tapTick by remember { mutableStateOf(0) }
     LaunchedEffect(tapTick) {
@@ -768,11 +810,39 @@ private fun FullscreenVideo(
         delay(8000)
         controlsVisible = false
     }
+    LaunchedEffect(tv, controlsVisible) {
+        if (!tv) return@LaunchedEffect
+        if (controlsVisible) {
+            exitFocusRequester.requestFocusUntilLanded { isExitFocused }
+        } else {
+            rootFocusRequester.requestFocusUntilLanded { isRootFocused }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(rootFocusRequester)
+            .onFocusChanged { isRootFocused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                val navigationKey = when (event.key) {
+                    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> true
+                    else -> false
+                }
+                if (!tv || !navigationKey) {
+                    false
+                } else if (!controlsVisible) {
+                    // Consume the wake-up press through release so it cannot activate Exit/PIP.
+                    if (event.type == KeyEventType.KeyUp) tapTick++
+                    true
+                } else {
+                    if (event.type == KeyEventType.KeyDown) tapTick++
+                    false
+                }
+            }
+            .focusable()
             .pointerInput(Unit) { detectTapGestures { tapTick++ } },
         contentAlignment = Alignment.Center
     ) {
@@ -781,14 +851,24 @@ private fun FullscreenVideo(
             visible = controlsVisible,
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            Row(modifier = Modifier.padding(8.dp)) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = if (isTv()) 48.dp else 8.dp, vertical = if (isTv()) 27.dp else 8.dp)
+                    .background(Color.Black.copy(alpha = 0.65f), CircleShape).padding(4.dp)
+            ) {
                 IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                     Icon(
                         painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
                         tint = Color.White.copy(alpha = 0.7f)
                     )
                 }
-                IconButton(onClick = onExitFullscreen, modifier = Modifier.dpadFocus()) {
+                IconButton(
+                    onClick = onExitFullscreen,
+                    modifier = Modifier
+                        .focusRequester(exitFocusRequester)
+                        .onFocusChanged { isExitFocused = it.isFocused }
+                        .dpadFocus(),
+                ) {
                     Icon(
                         Icons.Default.FullscreenExit, contentDescription = stringResource(R.string.cd_exit_fullscreen),
                         tint = Color.White.copy(alpha = 0.7f)
@@ -797,7 +877,11 @@ private fun FullscreenVideo(
             }
         }
         if (debugEnabled) {
-            DebugOverlay(debugInfo, Modifier.align(Alignment.TopStart).padding(8.dp))
+            DebugOverlay(
+                debugInfo,
+                Modifier.align(Alignment.TopStart)
+                    .padding(horizontal = if (isTv()) 48.dp else 8.dp, vertical = if (isTv()) 27.dp else 8.dp),
+            )
         }
         var showRes by remember { mutableStateOf(false) }
         LaunchedEffect(videoResolution) {
@@ -809,7 +893,8 @@ private fun FullscreenVideo(
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = showRes,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
+            modifier = Modifier.align(Alignment.BottomEnd)
+                .padding(horizontal = if (isTv()) 48.dp else 8.dp, vertical = if (isTv()) 27.dp else 8.dp)
         ) {
             Text(
                 text = videoResolution,
@@ -829,9 +914,36 @@ private fun HoldScanButton(
     onEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var remoteHeld by remember { mutableStateOf(false) }
+    val endScan by rememberUpdatedState(onEnd)
+    DisposableEffect(Unit) {
+        onDispose { if (remoteHeld) endScan() }
+    }
     Box(
         modifier = modifier
             .size(48.dp)
+            .dpadFocus(CircleShape)
+            .onFocusChanged {
+                if (!it.isFocused && remoteHeld) {
+                    remoteHeld = false
+                    endScan()
+                }
+            }
+            .onKeyEvent { event ->
+                if (event.key != Key.DirectionCenter && event.key != Key.Enter && event.key != Key.NumPadEnter) {
+                    false
+                } else {
+                    if (event.type == KeyEventType.KeyDown && !remoteHeld) {
+                        remoteHeld = true
+                        onBegin()
+                    } else if (event.type == KeyEventType.KeyUp && remoteHeld) {
+                        remoteHeld = false
+                        endScan()
+                    }
+                    true
+                }
+            }
+            .focusable()
             .clip(CircleShape)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
@@ -867,122 +979,143 @@ private fun AudioMiniController(viewModel: MainViewModel, visible: Boolean, onCl
 private fun NowPlayingContent(viewModel: MainViewModel) {
     val track by viewModel.trackInfo.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    val tv = isTv()
+    val surface = MaterialTheme.colorScheme.surface
+    val artworkColor = remember(track.coverArt) { track.coverArt?.let(::artworkAverageColor) }
+    val backdrop = artworkColor?.let { androidx.compose.ui.graphics.lerp(surface, it, 0.22f) } ?: surface
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(backdrop, surface)))
+            .padding(if (tv) 24.dp else 20.dp)
     ) {
-        // cover art
-        Box(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .aspectRatio(1f)
-                .fillMaxWidth(0.7f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) {
-            if (track.coverArt != null) {
-                Image(
-                    bitmap = track.coverArt!!.asImageBitmap(),
-                    contentDescription = stringResource(R.string.cd_cover_art),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.MusicNote,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // track info
-        Text(
-            text = track.title.ifEmpty { stringResource(R.string.unknown_track) },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (track.artist.isNotEmpty()) {
-            Text(
-                text = track.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (track.album.isNotEmpty()) {
-            Text(
-                text = track.album,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        val player = viewModel.dacpPlayer
-        if (player != null) {
-            // BottomControls' default row, minus its video-overlay gradient
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                PositionText(player, Modifier.padding(end = 8.dp))
-                Box(modifier = Modifier.weight(1f)) { ProgressSlider(player) }
-                DurationText(player, Modifier.padding(start = 8.dp))
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+        val wide = maxWidth >= 560.dp
+        val artSize = if (wide) minOf(maxWidth * 0.36f, maxHeight, 300.dp)
+            else minOf(maxWidth * 0.65f, maxHeight * 0.38f, 240.dp)
+        val artwork: @Composable () -> Unit = {
+            Box(
+                Modifier.size(artSize).clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
             ) {
-                HoldScanButton(
-                    icon = Icons.Default.FastRewind,
-                    contentDescription = stringResource(R.string.cd_rewind),
-                    onBegin = { viewModel.audioScanBegin(false) },
-                    onEnd = { viewModel.audioScanEnd() }
-                )
-                PreviousButton(player, modifier = Modifier.dpadFocus())
-                PlayPauseButton(
-                    player,
-                    modifier = Modifier.size(63.dp).dpadFocus(CircleShape),
-                    iconSize = 40.dp
-                )
-                NextButton(player, modifier = Modifier.dpadFocus())
-                HoldScanButton(
-                    icon = Icons.Default.FastForward,
-                    contentDescription = stringResource(R.string.cd_fast_forward),
-                    onBegin = { viewModel.audioScanBegin(true) },
-                    onEnd = { viewModel.audioScanEnd() }
-                )
+                if (track.coverArt != null) {
+                    Image(
+                        bitmap = track.coverArt!!.asImageBitmap(),
+                        contentDescription = stringResource(R.string.cd_cover_art),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.MusicNote, null, Modifier.size(72.dp),
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
+                }
             }
+        }
+        val details: @Composable () -> Unit = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.now_playing_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = track.title.ifEmpty { stringResource(R.string.unknown_track) },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = if (wide) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (track.artist.isNotEmpty()) {
+                    Text(
+                        text = track.artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (track.album.isNotEmpty()) {
+                    Text(
+                        text = track.album,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                val player = viewModel.dacpPlayer
+                if (player != null) {
+                    // Keep Media3 progress and transport callbacks intact.
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        PositionText(player, Modifier.padding(end = 8.dp))
+                        Box(modifier = Modifier.weight(1f)) { ProgressSlider(player, modifier = Modifier.dpadFocus()) }
+                        DurationText(player, Modifier.padding(start = 8.dp))
+                    }
 
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    ) {
+                        HoldScanButton(
+                            icon = Icons.Default.FastRewind,
+                            contentDescription = stringResource(R.string.cd_rewind),
+                            onBegin = { viewModel.audioScanBegin(false) },
+                            onEnd = { viewModel.audioScanEnd() }
+                        )
+                        PreviousButton(player, modifier = Modifier.dpadFocus())
+                        PlayPauseButton(
+                            player,
+                            modifier = Modifier.size(64.dp).dpadFocus(CircleShape),
+                            iconSize = 40.dp
+                        )
+                        NextButton(player, modifier = Modifier.dpadFocus())
+                        HoldScanButton(
+                            icon = Icons.Default.FastForward,
+                            contentDescription = stringResource(R.string.cd_fast_forward),
+                            onBegin = { viewModel.audioScanBegin(true) },
+                            onEnd = { viewModel.audioScanEnd() }
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(onClick = { viewModel.audioVolumeDown() }, modifier = Modifier.dpadFocus()) {
+                            Icon(Icons.AutoMirrored.Rounded.VolumeDown, stringResource(R.string.cd_volume_down))
+                        }
+                        IconButton(onClick = { viewModel.audioMuteToggle() }, modifier = Modifier.dpadFocus()) {
+                            Icon(Icons.AutoMirrored.Rounded.VolumeOff, stringResource(R.string.cd_mute))
+                        }
+                        IconButton(onClick = { viewModel.audioVolumeUp() }, modifier = Modifier.dpadFocus()) {
+                            Icon(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.cd_volume_up))
+                        }
+                    }
+                }
+            }
+        }
+        if (wide) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                Modifier.align(Alignment.Center).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = { viewModel.audioVolumeDown() }, modifier = Modifier.dpadFocus()) {
-                    Icon(Icons.AutoMirrored.Rounded.VolumeDown, stringResource(R.string.cd_volume_down))
-                }
-                IconButton(onClick = { viewModel.audioMuteToggle() }, modifier = Modifier.dpadFocus()) {
-                    Icon(Icons.AutoMirrored.Rounded.VolumeOff, stringResource(R.string.cd_mute))
-                }
-                IconButton(onClick = { viewModel.audioVolumeUp() }, modifier = Modifier.dpadFocus()) {
-                    Icon(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.cd_volume_up))
-                }
+                artwork()
+                Box(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(4.dp)) { details() }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                artwork()
+                details()
             }
         }
     }

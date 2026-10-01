@@ -76,7 +76,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -160,7 +162,11 @@ fun PlayerButton(
 
 @Composable
 fun PlayPauseButton(playing: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    PlayerButton(modifier = modifier.size(64.dp), onClick = onClick) {
+    PlayerButton(
+        modifier = modifier.size(if (isTv()) 88.dp else 76.dp),
+        onClick = onClick,
+        containerColor = Color(0xFF173653).copy(alpha = 0.92f),
+    ) {
         Icon(
             imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
             contentDescription = stringResource(R.string.cd_play_pause),
@@ -185,14 +191,16 @@ fun VideoControlsTop(
     val extraTopPadding = if (insets.calculateTopPadding() == 0.dp) 16.dp else 0.dp
     Row(
         modifier = modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)))
             .padding(
                 start = insets.calculateStartPadding(layoutDirection),
                 top = insets.calculateTopPadding(),
                 end = insets.calculateEndPadding(layoutDirection),
             )
-            .padding(horizontal = 8.dp)
-            .padding(bottom = 16.dp)
-            .padding(top = extraTopPadding),
+            .padding(horizontal = if (isTv()) 48.dp else 16.dp)
+            .padding(bottom = 24.dp)
+            .padding(top = if (isTv()) 27.dp else extraTopPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -201,7 +209,7 @@ fun VideoControlsTop(
         }
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -265,14 +273,16 @@ fun VideoControlsBottom(
     val layoutDirection = LocalLayoutDirection.current
     Column(
         modifier = modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
             .padding(
                 start = insets.calculateStartPadding(layoutDirection),
                 end = insets.calculateEndPadding(layoutDirection),
                 bottom = insets.calculateBottomPadding(),
             )
-            .padding(horizontal = 8.dp)
-            .padding(top = 16.dp)
-            .padding(bottom = 16.dp.takeIf { insets.calculateBottomPadding() == 0.dp } ?: 0.dp),
+            .padding(horizontal = if (isTv()) 48.dp else 16.dp)
+            .padding(top = 24.dp)
+            .padding(bottom = if (isTv()) 27.dp else 16.dp.takeIf { insets.calculateBottomPadding() == 0.dp } ?: 0.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
@@ -282,25 +292,25 @@ fun VideoControlsBottom(
             var showRemaining by rememberSaveable { mutableStateOf(false) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(
+                modifier = Modifier.dpadFocus().clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                 ) { showRemaining = !showRemaining },
             ) {
                 Text(
                     text = if (showRemaining) "-${formatVideoTime(durationMs - positionMs)}" else formatVideoTime(positionMs),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                     color = Color.White,
                 )
-                Text(text = " / ", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                Text(text = stringResource(R.string.time_separator), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace), color = Color.White.copy(alpha = 0.6f))
                 Text(
                     text = formatVideoTime(durationMs),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                     color = Color.White,
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            PlayerButton(modifier = Modifier.size(30.dp), onClick = onRotateClick) {
+            PlayerButton(modifier = Modifier.size(48.dp), onClick = onRotateClick) {
                 Icon(
                     Icons.Rounded.ScreenRotation,
                     contentDescription = stringResource(R.string.cd_rotate),
@@ -368,13 +378,14 @@ private fun PlayerSeekbar(
             modifier = modifier
                 .fillMaxWidth()
                 .onFocusChanged { isFocused = it.isFocused }
-                .height(24.dp),
+                .dpadFocus()
+                .height(40.dp),
             thumb = {
                 Box(
                     modifier = Modifier
                         .size(thumbSize)
                         .shadow(4.dp, CircleShape)
-                        .background(Color.White)
+                        .background(Color.White, CircleShape)
                         .then(
                             if (isFocused) {
                                 Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
@@ -386,15 +397,15 @@ private fun PlayerSeekbar(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
+                        .height(6.dp)
                         .clip(MaterialTheme.shapes.extraSmall)
-                        .background(Color.White.copy(alpha = 0.5f))
+                        .background(Color.White.copy(alpha = 0.25f))
                 ) {
                     if (durationMs > 0) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth((positionMs.toFloat() / durationMs).coerceIn(0f, 1f))
-                                .height(4.dp)
+                                .height(6.dp)
                                 .background(MaterialTheme.colorScheme.primary)
                         )
                     }
