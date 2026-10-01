@@ -3,6 +3,8 @@ package io.github.jqssun.airplay.service
 /** Playback owns transport lifetime, not the other way around. HOLD only marks
  * a paused session whose transport closed; it must never change play intent. */
 internal object VideoSessionPolicy {
+    // Shared by screen-on, PiP, and the Activity's background-stop decision.
+    fun hasSession(connectionCount: Int, videoActive: Boolean): Boolean = videoActive || connectionCount > 0
     enum class Reason {
         SENDER_STOP, PLAY_CONNECTION_CLOSED, ALL_CLIENTS_GONE, PLAYER_ENDED,
         PLAYER_ERROR_UNRECOVERABLE, LOCAL_EXIT, NEW_PLAY, SERVER_STOP,

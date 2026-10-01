@@ -6,6 +6,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VideoSessionPolicyTest {
+    @Test fun `activity keeps paused video alive without transport connections`() {
+        assertTrue(VideoSessionPolicy.hasSession(connectionCount = 0, videoActive = true))
+    }
+    @Test fun `activity session ends only without video or transport`() {
+        assertFalse(VideoSessionPolicy.hasSession(connectionCount = 0, videoActive = false))
+        assertTrue(VideoSessionPolicy.hasSession(connectionCount = 1, videoActive = false))
+    }
     @Test fun `explicit sender stop ends while paused or playing`() {
         for (paused in listOf(false, true)) {
             assertEquals(END, VideoSessionPolicy.decide(SENDER_STOP, paused))

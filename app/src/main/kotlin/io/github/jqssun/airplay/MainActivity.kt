@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.jqssun.airplay.service.AirPlayService
+import io.github.jqssun.airplay.service.VideoSessionPolicy
 import io.github.jqssun.airplay.ui.MainScreen
 import io.github.jqssun.airplay.ui.theme.AirPlayTheme
 import io.github.jqssun.airplay.viewmodel.MainViewModel
@@ -85,8 +86,8 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                combine(viewModel.keepScreenOn, viewModel.connectionCount) { keep, conns ->
-                    keep && conns > 0
+                combine(viewModel.keepScreenOn, viewModel.connectionCount, viewModel.videoPlaybackActive) { keep, conns, video ->
+                    keep && VideoSessionPolicy.hasSession(conns, video)
                 }.collect { on ->
                     if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -126,6 +127,7 @@ class MainActivity : ComponentActivity() {
         enterPictureInPictureMode(_pipParams())
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
     private fun _pipParams(): PictureInPictureParams {
         val aspect = if (viewModel.videoPlaybackActive.value) viewModel.videoPlaybackAspect.value
             else viewModel.videoAspect.value
@@ -139,7 +141,7 @@ class MainActivity : ComponentActivity() {
 
     private fun _shouldAutoPip(): Boolean =
         viewModel.serverState.value == AirPlayService.ServerState.RUNNING &&
-            viewModel.connectionCount.value > 0
+            VideoSessionPolicy.hasSession(viewModel.connectionCount.value, viewModel.videoPlaybackActive.value)
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
@@ -156,7 +158,7 @@ class MainActivity : ComponentActivity() {
         // never stop mid-session
         if (!viewModel.runInBackground.value && !isChangingConfigurations &&
             viewModel.serverState.value == AirPlayService.ServerState.RUNNING &&
-            viewModel.connectionCount.value == 0) {
+            !VideoSessionPolicy.hasSession(viewModel.connectionCount.value, viewModel.videoPlaybackActive.value)) {
             viewModel.stopServer()
         }
     }

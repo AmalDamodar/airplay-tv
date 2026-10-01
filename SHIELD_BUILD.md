@@ -6,8 +6,8 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 
 ## Source provenance
 
-- Upstream commit: `3a19f474f965a3994d9c5ba0170cb4d111006779`
-- UxPlay: `21eef8df25d91e12635c36d8176ad192725baca2` (`v1.73.6`)
+- Upstream revision: `c8defdd` (merged for 2.0.0-shield); use `git rev-parse HEAD` to pin the fork release.
+- UxPlay: `462153392f2e30937424922039ff9f0cda5e7b1a` plus the tracked patch stack
 - FFmpeg: `38b88335f99e76ed89ff3c93f877fdefce736c13` (`n8.1.2`)
 - libplist: `f41b1ea67045e0c09339974d83e389972d84f166`
 - openssl-cmake: `4edd36a8dab5f85a8f92650b5bdf6e0cab13aab8`
@@ -21,9 +21,14 @@ It contains no subscriptions, advertisements, analytics, or in-app purchases.
 - ARM64 and ARMv7 native libraries for Shield TV variants
 - Boot auto-start and background operation enabled by default
 - Sticky service recovery when Android kills the process, only while **Run in background** is enabled
-- Eighteen unit tests for service restart, opt-out behavior, log sanitization, local-pause stop handling, and theme policy
+- JVM policy tests for service restart, opt-out, logging, theme, session lifetime, stale callbacks, and transient recovery
+- Host-native regression harness: `JAVA_HOME=<jdk> bash app/src/test/native/run.sh`
 - Media URLs are sanitized before logging; credentials, paths, queries, and fragments are removed
-- Shield-remote pause remains resumable even when iOS immediately closes its AirPlay video connection
+- Idle HTTP connection closure no longer owns the video lifetime; paused playback retains position and media-button routing
+- Explicit stops stay final outside the narrow two-second receiver-local pause compatibility grace
+- Native playback generations reject stale snapshots; `/play` no longer blocks its own HLS HTTP server
+- Bounded recovery for transient source errors and expired live windows; retry work is canceled on stop
+- TV-first navigation, larger typography, visible D-pad focus, safe edge margins, grouped settings and transport controls
 - System, Light, and Dark app themes persist and update without restarting the receiver
 
 ## Features
