@@ -364,6 +364,19 @@ static void _video_acquire_playback_info(void *cls, playback_info_t *info) {
     }
 }
 
+/* HTTP-thread snapshot for reverse /event notifications. No JNI/player calls
+ * and no fabricated keep-alive polls. Only accepted stops publish 'stopped'. */
+static const char *_video_state(void *cls, uint64_t *generation) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    pthread_mutex_lock(&ctx->playback_info_lock);
+    *generation = (uint64_t) ctx->playback_generation;
+    const char *state = ctx->playback_duration < 0.0 ? "stopped" :
+        (!ctx->playback_ready || ctx->playback_buffering) ? "loading" :
+        ctx->playback_rate > 0.0f ? "playing" : "paused";
+    pthread_mutex_unlock(&ctx->playback_info_lock);
+    return state;
+}
+
 static float _video_playlist_remove(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     pthread_mutex_lock(&ctx->playback_info_lock);
@@ -412,6 +425,7 @@ void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx) 
     cbs->on_video_stop = _video_stop;
     cbs->on_video_acquire_playback_info = _video_acquire_playback_info;
     cbs->on_video_playlist_remove = _video_playlist_remove;
+    cbs->on_video_state = _video_state;
     if (ctx->require_pin) {
         cbs->check_register = _check_register;
         cbs->register_client = _register_client;

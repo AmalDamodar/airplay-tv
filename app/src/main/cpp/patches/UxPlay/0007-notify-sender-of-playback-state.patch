@@ -1,0 +1,107 @@
+diff --git a/lib/httpd.h b/lib/httpd.h
+--- a/lib/httpd.h
++++ b/lib/httpd.h
+@@ -37,0 +38,2 @@
++    /* Runs on the HTTP thread, including while the sender is idle. */
++    void  (*conn_poll)(void *ptr);
+diff --git a/lib/httpd.c b/lib/httpd.c
+--- a/lib/httpd.c
++++ b/lib/httpd.c
+@@ -412,0 +413,3 @@
++            if (httpd->connections[i].type == CONNECTION_TYPE_PTTH && httpd->callbacks.conn_poll) {
++                httpd->callbacks.conn_poll(httpd->connections[i].user_data);
++            }
+@@ -468 +471 @@
+-                    http_request_is_reverse(connection->request);
++                    http_request_set_reverse(connection->request);
+@@ -547 +549,0 @@
+-                    buffer[recv_datalen] = '\0';
+@@ -550 +552 @@
+-                               " on socket %d:\n%s\n", connection->socket_fd, buffer);
++                               " on socket %d:\n%.*s\n", connection->socket_fd, recv_datalen, buffer);
+diff --git a/lib/raop.h b/lib/raop.h
+--- a/lib/raop.h
++++ b/lib/raop.h
+@@ -113,0 +114,2 @@
++    /* Read-only snapshot; must not call the player or count as a sender poll. */
++    const char *(*on_video_state)(void *cls, uint64_t *generation);
+diff --git a/lib/raop.c b/lib/raop.c
+--- a/lib/raop.c
++++ b/lib/raop.c
+@@ -124,0 +125,2 @@
++    uint64_t last_event_generation;
++    const char *last_event_state;
+@@ -694,0 +697 @@
++    httpd_cbs.conn_poll = &http_poll_video_state;
+diff --git a/lib/http_handlers.h b/lib/http_handlers.h
+--- a/lib/http_handlers.h
++++ b/lib/http_handlers.h
+@@ -39,0 +40,68 @@
++}
++
++/* Notify the sender of real player transitions even when it stops polling.
++ * Called only by httpd, so these writes cannot race FCUP requests or socket
++ * destruction. A nonblocking send must never stall the HLS HTTP server. */
++static void
++http_poll_video_state(void *ptr) {
++    raop_conn_t *conn = ptr;
++    raop_t *raop = conn->raop;
++    if (!raop->callbacks.on_video_state || !conn->client_session_id ||
++        raop->current_video < 0 || raop->current_video >= MAX_AIRPLAY_VIDEO) return;
++    airplay_video_t *video = raop->airplay_video[raop->current_video];
++    if (!video) return;
++    const char *session_id = get_apple_session_id(video);
++    if (!session_id || strcmp(session_id, conn->client_session_id) ||
++        strpbrk(session_id, "\r\n")) return;
++
++    uint64_t generation = 0;
++    const char *state = raop->callbacks.on_video_state(raop->callbacks.cls, &generation);
++    if (!state || !generation) return;
++    if (conn->last_event_generation == generation && conn->last_event_state &&
++        !strcmp(state, conn->last_event_state)) return;
++
++    int fd = httpd_get_connection_socket(raop->httpd, conn);
++    if (fd < 0) return;
++    plist_t body = plist_new_dict();
++    plist_dict_set_item(body, "category", plist_new_string("video"));
++    plist_dict_set_item(body, "sessionID", plist_new_uint(generation));
++    plist_dict_set_item(body, "state", plist_new_string(state));
++    char *xml = NULL;
++    uint32_t xml_len = 0;
++    plist_to_xml(body, &xml, &xml_len);
++    plist_free(body);
++    if (!xml) return;
++    http_response_t *event = http_response_create();
++    if (!event) {
++        plist_mem_free(xml);
++        return;
++    }
++    http_response_reverse_request_init(event, "POST", "/event", "HTTP/1.1");
++    http_response_add_header(event, "X-Apple-Session-ID", session_id);
++    http_response_add_header(event, "Content-Type", "text/x-apple-plist+xml");
++    http_response_finish(event, xml, (int) xml_len);
++    plist_mem_free(xml);
++
++    int length = 0;
++    const char *data = http_response_get_data(event, &length);
++    int written = 0;
++    while (written < length) {
++        int sent = send(fd, data + written, length - written, MSG_DONTWAIT | MSG_NOSIGNAL);
++        if (sent <= 0) {
++            int err = SOCKET_GET_ERROR();
++            /* Retry a wholly unsent event on the next tick. Never append an
++             * FCUP message to a partial event; reconnect that channel instead. */
++            if (written || sent == 0 || (err != SOCKET_ERRORNAME(EAGAIN) &&
++                err != SOCKET_ERRORNAME(EWOULDBLOCK) && err != SOCKET_ERRORNAME(EINTR))) {
++                shutdown(fd, SHUT_RDWR);
++            }
++            break;
++        }
++        written += sent;
++    }
++    if (written == length) {
++        conn->last_event_generation = generation;
++        conn->last_event_state = state; /* callback returns static state names */
++        logger_log(raop->logger, LOGGER_INFO, "AirPlay video state event: %s", state);
++    }
++    http_response_destroy(event);

@@ -166,7 +166,7 @@ class AirPlayVideoPlayer(private val context: Context) {
         _reportPlaybackInfo()
     }
 
-    // local-only: the sender self-syncs from its next /playback-info poll
+    // The native snapshot also drives reverse /event state notifications.
     fun setPlaying(playing: Boolean) = onMain {
         player?.playWhenReady = playing
         _reportPlaybackInfo()
