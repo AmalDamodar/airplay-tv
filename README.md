@@ -9,6 +9,10 @@ already built in.
 
 <p>
 <img src="screenshots/overview.jpg" width="49%" alt="Overview: the status dot glows green when the receiver is ready">
+<img src="screenshots/receive.jpg" width="49%" alt="Receive: scan the code on the TV, send files from a phone or computer, see them arrive">
+</p>
+<p>
+<img src="screenshots/files.jpg" width="49%" alt="Files: a remote-friendly file manager with Copy, Move, Rename and Delete">
 <img src="screenshots/settings.jpg" width="49%" alt="Settings: the selected row gets a soft highlight">
 </p>
 
