@@ -21,6 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,31 +31,67 @@ import androidx.compose.ui.unit.dp
 import io.github.jqssun.airplay.R
 import io.github.jqssun.airplay.service.AirPlayService.ServerState
 
+private val StatusGreen = Color(0xFF30D371)
+private val StatusYellow = Color(0xFFFFC21F)
+private val StatusRed = Color(0xFFFF5A52)
+
+/**
+ * Status chip. The dot glows green when the receiver is ready or streaming, yellow (breathing) while a device is
+ * connecting, red when stopped or in error.
+ */
 @Composable
-internal fun ReceiverStatus(state: ServerState, connections: Int = 0) {
-    val color = when (state) {
-        ServerState.RUNNING -> MaterialTheme.colorScheme.onSurface
-        ServerState.ERROR -> MaterialTheme.colorScheme.error
-        ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
+internal fun ReceiverStatus(state: ServerState, connections: Int = 0, connecting: Boolean = false) {
+    val waiting = state == ServerState.RUNNING && connections > 0 && connecting
+    val color = when {
+        state == ServerState.ERROR || state == ServerState.STOPPED -> StatusRed
+        waiting -> StatusYellow
+        else -> StatusGreen
     }
-    Surface(color = color.copy(alpha = 0.1f), shape = CircleShape) {
+    Surface(color = color.copy(alpha = 0.16f), shape = CircleShape) {
         Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            Modifier.padding(start = 8.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Box(Modifier.size(7.dp).background(color, CircleShape))
+            GlowDot(color, breathing = waiting)
             Text(
-                when (state) {
-                    ServerState.RUNNING -> if (connections > 0) stringResource(R.string.connected_count, connections)
-                        else stringResource(R.string.ready_label)
-                    ServerState.ERROR -> stringResource(R.string.error_label)
-                    ServerState.STOPPED -> stringResource(R.string.stopped_label)
+                when {
+                    state == ServerState.ERROR -> stringResource(R.string.error_label)
+                    state == ServerState.STOPPED -> stringResource(R.string.stopped_label)
+                    waiting -> stringResource(R.string.connecting_label)
+                    connections > 0 -> stringResource(R.string.connected_count, connections)
+                    else -> stringResource(R.string.ready_label)
                 },
                 style = MaterialTheme.typography.labelLarge,
-                color = color,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
+    }
+}
+
+@Composable
+private fun GlowDot(color: Color, breathing: Boolean) {
+    val transition = rememberInfiniteTransition(label = "statusDot")
+    val breath by transition.animateFloat(
+        initialValue = 0.45f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
+        label = "statusBreath",
+    )
+    val level = if (breathing) breath else 1f
+    Box(
+        Modifier.size(26.dp).drawBehind {
+            val r = size.minDimension / 2
+            drawCircle(
+                Brush.radialGradient(
+                    0f to color.copy(alpha = 0.75f * level), 0.4f to color.copy(alpha = 0.32f * level),
+                    1f to Color.Transparent, radius = r,
+                ),
+                radius = r,
+            )
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(10.dp).background(color.copy(alpha = 0.55f + 0.45f * level), CircleShape))
     }
 }
 

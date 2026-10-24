@@ -38,8 +38,8 @@ android {
         applicationId = "com.minimaltv.airplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 301
-        versionName = "2.0.1-glass.1"
+        versionCode = 302
+        versionName = "2.0.1-glass.2"
 
         if (!prebuiltNative) {
             externalNativeBuild {

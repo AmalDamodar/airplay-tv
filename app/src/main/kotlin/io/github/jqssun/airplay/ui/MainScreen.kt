@@ -770,7 +770,10 @@ private fun OverviewContent(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    ReceiverStatus(state, connections)
+                    ReceiverStatus(
+                        state, connections,
+                        connecting = !mirroringActive && !videoPlaybackActive,
+                    )
                 }
                 Button(
                     onClick = {
