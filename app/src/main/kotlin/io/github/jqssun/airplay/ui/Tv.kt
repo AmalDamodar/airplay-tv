@@ -31,8 +31,8 @@ fun isTv(): Boolean {
     return remember(ctx) { ctx.isTvDevice() }
 }
 
-fun Modifier.dpadFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier = composed {
-    focusRing(shape = shape)
+fun Modifier.dpadFocus(shape: Shape = RoundedCornerShape(12.dp), focusScale: Float = 1.035f): Modifier = composed {
+    focusRing(shape = shape, focusScale = focusScale)
 }
 
 fun Modifier.dpadAdjust(onLeft: () -> Unit, onRight: () -> Unit): Modifier = composed {

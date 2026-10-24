@@ -1,0 +1,12 @@
+AirPlay Receiver (glass) is a fork of Shield AirPlay (https://github.com/ebreen/shield-airplay), GPL v3, which is derived
+from android-airplay-server by jqssun (https://github.com/jqssun/android-airplay-server) and uses UxPlay
+(https://github.com/FDH2/UxPlay). The full commit history of those authors is preserved in this repository.
+
+Bundled fonts and images:
+
+- Outfit font (app/src/main/res/font/outfit.ttf): SIL Open Font License 1.1, copy in licenses/Outfit-OFL.txt.
+- Two blurred background photos (app/src/main/res/drawable-nodpi/glass_bg_*.jpg) made from Unsplash photos, used under
+  the Unsplash licence (https://unsplash.com/license). The photographers of the set they were chosen from are Thomas
+  Griesbeck, Niklas Jonasson, Linus Nylund, Atsadawut Chaiseeha, raouf bedrani and MagicPattern.
+
+"AirPlay" is a trademark of Apple Inc. This project is not affiliated with or endorsed by Apple.

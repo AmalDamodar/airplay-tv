@@ -16,7 +16,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -34,6 +46,7 @@ import io.github.jqssun.airplay.viewmodel.MainViewModel
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
+
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
@@ -60,7 +73,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val audioLatencyMs by viewModel.audioLatencyMs.collectAsState()
     val forceSwAlac by viewModel.forceSwAlac.collectAsState()
     val debugEnabled by viewModel.debugEnabled.collectAsState()
-    val developerOptions by viewModel.developerOptions.collectAsState()
     val keyAllowFrameDrop by viewModel.keyAllowFrameDrop.collectAsState()
     val realtimeDecoderPriority by viewModel.realtimeDecoderPriority.collectAsState()
     val lowLatency by viewModel.lowLatency.collectAsState()
@@ -73,15 +85,17 @@ fun SettingsScreen(viewModel: MainViewModel) {
     val oboeBufferFrames by viewModel.oboeBufferFrames.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
 
+
+    var advancedOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
-            modifier = Modifier.widthIn(max = 900.dp).fillMaxHeight().fillMaxWidth()
+            modifier = Modifier.widthIn(max = 880.dp).fillMaxHeight().fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(if (isTv()) 12.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = if (isTv()) 12.dp else 16.dp, vertical = if (isTv()) 4.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 6.dp)) {
+                Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineLarge)
                 Text(
                     stringResource(R.string.settings_intro),
                     style = MaterialTheme.typography.bodyMedium,
@@ -94,14 +108,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     value = serverName,
                     onCommit = { viewModel.setServerName(it) }
                 )
-
-                SettingTextField(
-                    label = stringResource(R.string.setting_server_port),
-                    value = serverPort.toString(),
-                    onCommit = { viewModel.setServerPort(it.toInt()) },
-                    range = 1..65535
-                )
-
                 SettingSwitch(
                     title = stringResource(R.string.setting_boot_auto_start),
                     description = stringResource(R.string.setting_boot_auto_start_desc),
@@ -124,13 +130,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     onCheckedChange = { viewModel.setRequirePin(it) }
                 )
 
-                SettingSwitch(
-                    title = stringResource(R.string.setting_allow_new_conn),
-                    description = stringResource(R.string.setting_allow_new_conn_desc),
-                    checked = allowNewConn,
-                    onCheckedChange = { viewModel.setAllowNewConn(it) }
-                )
-
                 val ctx = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
                 var hasOverlayPermission by remember { mutableStateOf(canAutoLaunch(ctx)) }
@@ -144,7 +143,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 val needsOverlayPermission = launchOnConnect && !hasOverlayPermission
                 SettingsRow(
                     modifier = Modifier
-                        .dpadFocus()
+                        .dpadFocus(FocusShape, focusScale = 1f)
                         .toggleable(
                             value = launchOnConnect,
                             role = Role.Switch,
@@ -161,16 +160,47 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         ))
                     },
                     trailingContent = {
-                        Switch(checked = launchOnConnect, onCheckedChange = null)
+                        Switch(checked = launchOnConnect, onCheckedChange = null, colors = glassSwitchColors())
                     }
                 )
             }
-            SettingsGroup(stringResource(R.string.section_display)) {
+            SettingsGroup(stringResource(R.string.section_appearance)) {
                 SettingThemeMode(
                     value = themeMode,
                     onValueChange = viewModel::setThemeMode,
                 )
-
+            }
+            SettingsGroup(null) {
+                AdvancedHeader(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen })
+            }
+            if (advancedOpen) {
+                SettingsGroup(stringResource(R.string.section_compat), stringResource(R.string.section_compat_note)) {
+                    SettingSwitch(
+                        title = stringResource(R.string.setting_advertise_video),
+                        description = stringResource(R.string.setting_advertise_video_desc),
+                        checked = advertiseVideo,
+                        onCheckedChange = { viewModel.setAdvertiseVideo(it) }
+                    )
+                    SettingSwitch(
+                        title = stringResource(R.string.setting_advertise_audio),
+                        description = stringResource(R.string.setting_advertise_audio_desc),
+                        checked = advertiseAudio,
+                        onCheckedChange = { viewModel.setAdvertiseAudio(it) }
+                    )
+                    SettingSwitch(
+                        title = stringResource(R.string.setting_alac),
+                        description = stringResource(R.string.setting_alac_desc),
+                        checked = alacEnabled,
+                        onCheckedChange = { viewModel.setAlacEnabled(it) }
+                    )
+                    SettingSwitch(
+                        title = stringResource(R.string.setting_aac),
+                        description = stringResource(R.string.setting_aac_desc),
+                        checked = aacEnabled,
+                        onCheckedChange = { viewModel.setAacEnabled(it) }
+                    )
+                }
+                SettingsGroup(stringResource(R.string.section_display)) {
                 SettingSwitch(
                     title = stringResource(R.string.setting_auto_fullscreen),
                     description = stringResource(R.string.setting_auto_fullscreen_desc),
@@ -199,38 +229,6 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     checked = overscanned,
                     onCheckedChange = { viewModel.setOverscanned(it) }
                 )
-            }
-            SettingsGroup(stringResource(R.string.section_decode)) {
-                SettingSwitch(
-                    title = stringResource(R.string.setting_h265),
-                    description = stringResource(R.string.setting_h265_desc),
-                    checked = h265Enabled,
-                    onCheckedChange = { viewModel.setH265Enabled(it) }
-                )
-
-                SettingSwitch(
-                    title = stringResource(R.string.setting_sw_alac),
-                    description = stringResource(R.string.setting_sw_alac_desc),
-                    checked = forceSwAlac,
-                    onCheckedChange = { viewModel.setForceSwAlac(it) }
-                )
-            }
-            SettingsGroup(stringResource(R.string.section_developer)) {
-                SettingSwitch(
-                    title = stringResource(R.string.setting_developer_options),
-                    description = stringResource(R.string.setting_developer_options_desc),
-                    checked = developerOptions,
-                    onCheckedChange = { viewModel.setDeveloperOptions(it) }
-                )
-
-                if (developerOptions) {
-                    SettingSwitch(
-                        title = stringResource(R.string.setting_auto_start),
-                        description = stringResource(R.string.setting_auto_start_desc),
-                        checked = autoStart,
-                        onCheckedChange = { viewModel.setAutoStart(it) }
-                    )
-
                     SettingSwitch(
                         title = stringResource(R.string.setting_keep_screen_on),
                         description = stringResource(R.string.setting_keep_screen_on_desc),
@@ -244,35 +242,41 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         checked = idlePreview,
                         onCheckedChange = { viewModel.setIdlePreview(it) }
                     )
-
+                }
+                SettingsGroup(stringResource(R.string.section_network)) {
+                SettingTextField(
+                    label = stringResource(R.string.setting_server_port),
+                    value = serverPort.toString(),
+                    onCommit = { viewModel.setServerPort(it.toInt()) },
+                    range = 1..65535
+                )
+                SettingSwitch(
+                    title = stringResource(R.string.setting_allow_new_conn),
+                    description = stringResource(R.string.setting_allow_new_conn_desc),
+                    checked = allowNewConn,
+                    onCheckedChange = { viewModel.setAllowNewConn(it) }
+                )
                     SettingSwitch(
-                        title = stringResource(R.string.setting_advertise_video),
-                        description = stringResource(R.string.setting_advertise_video_desc),
-                        checked = advertiseVideo,
-                        onCheckedChange = { viewModel.setAdvertiseVideo(it) }
+                        title = stringResource(R.string.setting_auto_start),
+                        description = stringResource(R.string.setting_auto_start_desc),
+                        checked = autoStart,
+                        onCheckedChange = { viewModel.setAutoStart(it) }
                     )
+                }
+                SettingsGroup(stringResource(R.string.section_decode)) {
+                SettingSwitch(
+                    title = stringResource(R.string.setting_h265),
+                    description = stringResource(R.string.setting_h265_desc),
+                    checked = h265Enabled,
+                    onCheckedChange = { viewModel.setH265Enabled(it) }
+                )
 
-                    SettingSwitch(
-                        title = stringResource(R.string.setting_advertise_audio),
-                        description = stringResource(R.string.setting_advertise_audio_desc),
-                        checked = advertiseAudio,
-                        onCheckedChange = { viewModel.setAdvertiseAudio(it) }
-                    )
-
-                    SettingSwitch(
-                        title = stringResource(R.string.setting_alac),
-                        description = stringResource(R.string.setting_alac_desc),
-                        checked = alacEnabled,
-                        onCheckedChange = { viewModel.setAlacEnabled(it) }
-                    )
-
-                    SettingSwitch(
-                        title = stringResource(R.string.setting_aac),
-                        description = stringResource(R.string.setting_aac_desc),
-                        checked = aacEnabled,
-                        onCheckedChange = { viewModel.setAacEnabled(it) }
-                    )
-
+                SettingSwitch(
+                    title = stringResource(R.string.setting_sw_alac),
+                    description = stringResource(R.string.setting_sw_alac_desc),
+                    checked = forceSwAlac,
+                    onCheckedChange = { viewModel.setForceSwAlac(it) }
+                )
                     SettingSwitch(
                         title = stringResource(R.string.setting_key_allow_frame_drop),
                         description = stringResource(R.string.setting_key_allow_frame_drop_desc),
@@ -319,7 +323,8 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         checked = scheduledOutputBufferRelease,
                         onCheckedChange = { viewModel.setScheduledOutputBufferRelease(it) }
                     )
-
+                }
+                SettingsGroup(stringResource(R.string.section_audio_sync)) {
                     SettingSwitch(
                         title = stringResource(R.string.setting_audio_delay),
                         description = stringResource(R.string.setting_audio_delay_desc),
@@ -337,7 +342,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                     onValueChangeFinished = { viewModel.setAudioLatencyMs(sliderVal.roundToInt()) },
                                     valueRange = 0f..1000f,
                                     steps = 19,
-                                    modifier = Modifier.heightIn(min = 48.dp).dpadFocus().dpadAdjust(
+                                    modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f).dpadAdjust(
                                         onLeft = { viewModel.setAudioLatencyMs((audioLatencyMs - 50).coerceIn(0, 1000)) },
                                         onRight = { viewModel.setAudioLatencyMs((audioLatencyMs + 50).coerceIn(0, 1000)) }
                                     )
@@ -365,7 +370,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                     onValueChangeFinished = { viewModel.setAudioAdaptiveStep(stepVal.roundToInt()) },
                                     valueRange = 0f..maxStep.toFloat(),
                                     steps = maxStep - 1,
-                                    modifier = Modifier.heightIn(min = 48.dp).dpadFocus().dpadAdjust(
+                                    modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f).dpadAdjust(
                                         onLeft = { viewModel.setAudioAdaptiveStep((audioAdaptiveStep - 1).coerceIn(0, maxStep)) },
                                         onRight = { viewModel.setAudioAdaptiveStep((audioAdaptiveStep + 1).coerceIn(0, maxStep)) }
                                     )
@@ -395,8 +400,8 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         description = stringResource(R.string.setting_oboe_buffer_frames_desc),
                         range = 0..8192
                     )
-
-
+                }
+                SettingsGroup(stringResource(R.string.section_diagnostics)) {
                     SettingSwitch(
                         title = stringResource(R.string.setting_debug_overlay),
                         description = stringResource(R.string.setting_debug_overlay_desc),
@@ -416,6 +421,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     }
 }
 
+
 private fun canAutoLaunch(ctx: Context): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(ctx)
 
@@ -423,29 +429,40 @@ private fun _overlayIntent(ctx: Context): Intent =
     Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+
 @Composable
-private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsGroup(
+    title: String?,
+    footer: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp),
+        if (title != null) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 22.dp),
+            )
+        }
+        Column(
+            Modifier.fillMaxWidth().glass().padding(vertical = 6.dp)
+                // the last row's divider would sit on the panel edge: cut the bottom 2 dp off
+                .drawWithContent { clipRect(bottom = size.height - 2.dp.toPx()) { this@drawWithContent.drawContent() } },
+            content = content,
         )
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = content,
+        if (footer != null) {
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 22.dp),
             )
         }
     }
 }
 
+/** One row of a group: text on the left, control on the right, hairline divider underneath. */
 @Composable
 private fun SettingsRow(
     headlineContent: @Composable () -> Unit,
@@ -453,12 +470,112 @@ private fun SettingsRow(
     supportingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
-    ListItem(
-        headlineContent = headlineContent,
-        supportingContent = supportingContent,
-        trailingContent = trailingContent,
-        modifier = modifier.heightIn(min = if (isTv()) 88.dp else 72.dp),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    val divider = LocalGlass.current.divider
+    // Inset by 8 dp so the focus ring is never cut off by the rounded panel.
+    Box(
+        Modifier.padding(horizontal = 8.dp).drawBehind {
+            drawLine(divider, Offset(20.dp.toPx(), size.height), Offset(size.width - 20.dp.toPx(), size.height), 1.dp.toPx())
+        }
+    ) {
+        ListItem(
+            headlineContent = headlineContent,
+            supportingContent = supportingContent,
+            trailingContent = trailingContent,
+            modifier = Modifier.padding(vertical = 2.dp).then(modifier).heightIn(min = if (isTv()) 84.dp else 68.dp),
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun AdvancedHeader(open: Boolean, onToggle: () -> Unit) {
+    SettingsRow(
+        modifier = Modifier.dpadFocus(FocusShape, focusScale = 1f).clickable(onClick = onToggle),
+        headlineContent = { Text(stringResource(R.string.section_advanced)) },
+        supportingContent = { Text(stringResource(R.string.section_advanced_desc)) },
+        trailingContent = {
+            Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null)
+        },
+    )
+}
+
+private val FocusShape = RoundedCornerShape(20.dp)
+
+@Composable
+private fun glassSwitchColors(): SwitchColors {
+    val g = LocalGlass.current
+    val onTrack = g.text
+    val onThumb = if (g.dark) Color(0xFF111114) else Color.White
+    val offTrack = if (g.dark) Color(0x33FFFFFF) else Color(0x33000000)
+    val offThumb = if (g.dark) Color(0xE6FFFFFF) else Color.White
+    return SwitchDefaults.colors(
+        checkedThumbColor = onThumb, checkedTrackColor = onTrack, checkedBorderColor = Color.Transparent,
+        uncheckedThumbColor = offThumb, uncheckedTrackColor = offTrack, uncheckedBorderColor = Color.Transparent,
+    )
+}
+
+@Composable
+private fun glassChipColors(): SelectableChipColors {
+    val g = LocalGlass.current
+    return FilterChipDefaults.filterChipColors(
+        containerColor = Color.Transparent,
+        labelColor = g.text,
+        selectedContainerColor = g.pill,
+        selectedLabelColor = g.text,
+    )
+}
+
+@Composable
+private fun glassFieldColors(): TextFieldColors {
+    val g = LocalGlass.current
+    return OutlinedTextFieldDefaults.colors(
+        focusedTextColor = g.text, unfocusedTextColor = g.text,
+        focusedBorderColor = g.text, unfocusedBorderColor = g.textDim.copy(alpha = 0.45f),
+        focusedLabelColor = g.text, unfocusedLabelColor = g.textDim,
+        cursorColor = g.text,
+        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+        focusedSupportingTextColor = g.textDim, unfocusedSupportingTextColor = g.textDim,
+    )
+}
+
+/** Apple-style segmented control: one pill track, the chosen option raised. */
+@Composable
+private fun <T> GlassSegmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+    val g = LocalGlass.current
+    Row(
+        Modifier.clip(CircleShape).background(g.divider).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (value, label) ->
+            val chosen = value == selected
+            Box(
+                Modifier
+                    .dpadFocus(CircleShape, focusScale = 1f)
+                    .clip(CircleShape)
+                    .background(if (chosen) g.pill else Color.Transparent)
+                    .selectable(selected = chosen, role = Role.RadioButton, onClick = { onSelect(value) })
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, color = g.text, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingThemeMode(
+    value: ThemeMode,
+    onValueChange: (ThemeMode) -> Unit,
+) {
+    val choices = listOf(
+        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+        ThemeMode.DARK to stringResource(R.string.theme_dark),
+    )
+    SettingsRow(
+        headlineContent = { Text(stringResource(R.string.setting_theme)) },
+        trailingContent = { GlassSegmented(choices, value, onValueChange) },
     )
 }
 
@@ -493,6 +610,7 @@ private fun SettingResolution(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     @Composable
                     fun presetChip(key: String, label: String) = FilterChip(
+ colors = glassChipColors(),
                         selected = value == key && !editing,
                         onClick = {
                             editing = false
@@ -500,14 +618,15 @@ private fun SettingResolution(
                             onValueChange(key)
                         },
                         label = { Text(label) },
-                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus()
+                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f)
                     )
                     presets.forEach { (key, label) -> presetChip(key, label) }
                     FilterChip(
+ colors = glassChipColors(),
                         selected = !isPreset || editing,
                         onClick = { editing = true },
                         label = { Text(stringResource(R.string.chip_custom)) },
-                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus()
+                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f)
                     )
                     devicePresets.forEach { (key, label) -> presetChip(key, label) }
                 }
@@ -515,6 +634,7 @@ private fun SettingResolution(
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
+ colors = glassFieldColors(),
                             value = width,
                             onValueChange = { width = it.filter { c -> c.isDigit() }.take(5) },
                             singleLine = true,
@@ -523,9 +643,10 @@ private fun SettingResolution(
                                 keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Next
                             ),
-                            modifier = Modifier.weight(1f).dpadFocus()
+                            modifier = Modifier.weight(1f).dpadFocus(FocusShape, focusScale = 1f)
                         )
                         OutlinedTextField(
+ colors = glassFieldColors(),
                             value = height,
                             onValueChange = { height = it.filter { c -> c.isDigit() }.take(5) },
                             singleLine = true,
@@ -542,7 +663,7 @@ private fun SettingResolution(
                                     editing = false
                                 }
                             },
-                            modifier = Modifier.weight(1f).dpadFocus()
+                            modifier = Modifier.weight(1f).dpadFocus(FocusShape, focusScale = 1f)
                         )
                     }
                 }
@@ -571,6 +692,7 @@ private fun SettingTextField(
         if (valid && text != value) onCommit(text)
     }
     OutlinedTextField(
+ colors = glassFieldColors(),
         value = text,
         onValueChange = { text = if (range == null) it else it.filter { c -> c.isDigit() }.take(6) },
         label = { Text(label) },
@@ -587,7 +709,7 @@ private fun SettingTextField(
             .padding(horizontal = 16.dp)
             .padding(bottom = 8.dp)
             .onFocusChanged { if (!it.isFocused) save() }
-            .dpadFocus()
+            .dpadFocus(FocusShape, focusScale = 1f)
     )
 }
 
@@ -613,15 +735,17 @@ private fun SettingChipField(
                 Spacer(Modifier.height(8.dp))
                 ChipRow(if (editing) "" else value, presets, { editing = false; text = ""; onValueChange(it) }) {
                     FilterChip(
+ colors = glassChipColors(),
                         selected = !isPreset || editing,
                         onClick = { editing = true },
                         label = { Text(stringResource(R.string.chip_custom)) },
-                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus()
+                        modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f)
                     )
                 }
                 if (editing || !isPreset) {
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
+ colors = glassFieldColors(),
                         value = text,
                         onValueChange = { text = it },
                         singleLine = true,
@@ -636,43 +760,11 @@ private fun SettingChipField(
                                 editing = false
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().dpadFocus()
+                        modifier = Modifier.fillMaxWidth().dpadFocus(FocusShape, focusScale = 1f)
                     )
                 }
             }
         }
-    )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SettingThemeMode(
-    value: ThemeMode,
-    onValueChange: (ThemeMode) -> Unit,
-) {
-    val choices = listOf(
-        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
-        ThemeMode.LIGHT to stringResource(R.string.theme_light),
-        ThemeMode.DARK to stringResource(R.string.theme_dark),
-    )
-    SettingsRow(
-        headlineContent = { Text(stringResource(R.string.setting_theme)) },
-        supportingContent = {
-            Column {
-                Text(stringResource(R.string.setting_theme_desc))
-                Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    choices.forEach { (mode, label) ->
-                        FilterChip(
-                            selected = value == mode,
-                            onClick = { onValueChange(mode) },
-                            label = { Text(label) },
-                            modifier = Modifier.heightIn(min = 48.dp).dpadFocus(),
-                        )
-                    }
-                }
-            }
-        },
     )
 }
 
@@ -687,10 +779,11 @@ private fun ChipRow(
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (key, label) ->
             FilterChip(
+ colors = glassChipColors(),
                 selected = value == key,
                 onClick = { onSelect(key) },
                 label = { Text(label) },
-                modifier = Modifier.heightIn(min = 48.dp).dpadFocus()
+                modifier = Modifier.heightIn(min = 48.dp).dpadFocus(FocusShape, focusScale = 1f)
             )
         }
         trailing()
@@ -726,10 +819,10 @@ private fun SettingSwitch(
 ) {
     SettingsRow(
         modifier = Modifier
-            .dpadFocus()
+            .dpadFocus(FocusShape, focusScale = 1f)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
         headlineContent = { Text(title) },
         supportingContent = { Text(description) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null) }
+        trailingContent = { Switch(checked = checked, onCheckedChange = null, colors = glassSwitchColors()) }
     )
 }

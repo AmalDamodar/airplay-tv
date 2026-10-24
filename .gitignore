@@ -12,3 +12,6 @@
 /device-verification/
 
 *.jks
+
+# Prebuilt native libraries, fetched by tools/fetch-native-libs.sh
+/app/src/main/jniLibs/

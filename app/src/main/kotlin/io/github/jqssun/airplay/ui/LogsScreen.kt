@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -52,10 +53,8 @@ fun LogsScreen(viewModel: MainViewModel) {
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shape = MaterialTheme.shapes.large,
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp).glass(),
         ) {
             if (logs.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -69,7 +68,7 @@ fun LogsScreen(viewModel: MainViewModel) {
             SelectionContainer {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(6.dp).dpadFocus().focusable(),
+                    modifier = Modifier.fillMaxSize().padding(6.dp).dpadFocus(focusScale = 1f).focusable(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     itemsIndexed(logs) { index, line ->
@@ -78,8 +77,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth()
-                                .background(if (index % 2 == 0) MaterialTheme.colorScheme.surface
-                                    else MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(if (index % 2 == 0) Color.Transparent else LocalGlass.current.divider.copy(alpha = 0.06f))
                                 .padding(horizontal = 14.dp, vertical = 7.dp),
                         )
                     }

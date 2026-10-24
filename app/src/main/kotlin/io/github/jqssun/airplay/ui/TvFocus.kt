@@ -30,9 +30,10 @@ fun Modifier.focusRing(
     shape: Shape = CircleShape,
     color: Color = MaterialTheme.colorScheme.primary,
     width: Dp = 3.dp,
+    focusScale: Float = 1.035f,
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.035f else 1f, tween(160), label = "focusScale")
+    val scale by animateFloatAsState(if (focused) focusScale else 1f, tween(160), label = "focusScale")
     val highlight by animateFloatAsState(if (focused) 0.14f else 0f, tween(160), label = "focusTint")
     return this
         .onFocusChanged { focused = it.hasFocus }

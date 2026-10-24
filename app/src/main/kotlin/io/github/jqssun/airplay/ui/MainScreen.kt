@@ -528,8 +528,9 @@ fun MainScreen(
         )
     } else {
         val tv = isTv()
+        GlassBackground {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = Color.Transparent,
             bottomBar = {
                 if (!tv) {
                     Column {
@@ -538,13 +539,23 @@ fun MainScreen(
                             visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
                             onClick = { tab = Tab.OVERVIEW }
                         )
-                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            modifier = Modifier.glass(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                        ) {
                             Tab.entries.forEach { t ->
                                 NavigationBarItem(
                                     selected = tab == t,
                                     onClick = { tab = t },
                                     icon = { Icon(t.icon, null) },
                                     label = { Text(stringResource(t.labelRes)) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = LocalGlass.current.text,
+                                        selectedTextColor = LocalGlass.current.text,
+                                        indicatorColor = LocalGlass.current.pill,
+                                        unselectedIconColor = LocalGlass.current.textDim,
+                                        unselectedTextColor = LocalGlass.current.textDim,
+                                    ),
                                     modifier = Modifier.dpadFocus()
                                 )
                             }
@@ -560,8 +571,8 @@ fun MainScreen(
             ) {
                 if (tv) {
                     NavigationRail(
-                        modifier = Modifier.fillMaxHeight().width(104.dp).clip(MaterialTheme.shapes.large),
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxHeight().width(112.dp).glass(),
+                        containerColor = Color.Transparent,
                         windowInsets = WindowInsets(0, 0, 0, 0),
                         header = {
                             Icon(
@@ -578,7 +589,9 @@ fun MainScreen(
                                 onClick = { tab = t },
                                 icon = { Icon(t.icon, null) },
                                 label = { Text(stringResource(t.labelRes)) },
-                                modifier = Modifier.padding(vertical = 6.dp).dpadFocus(),
+                                colors = glassNavColors(),
+                                modifier = Modifier.padding(vertical = 6.dp).dpadFocus(RoundedCornerShape(28.dp), focusScale = 1f)
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
                             )
                         }
                     }
@@ -599,6 +612,7 @@ fun MainScreen(
                     }
                 }
             }
+        }
         }
     }
 
@@ -672,8 +686,7 @@ private fun OverviewContent(
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(if (tv) 0.dp else 16.dp)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surface),
+                .glass(),
             contentAlignment = Alignment.Center
         ) {
             val connecting = state == ServerState.RUNNING && connections > 0 &&
@@ -739,11 +752,10 @@ private fun OverviewContent(
         }
 
         // Keep the server action outside the scrolling content and its initial TV focus.
-        Card(
+        Box(
             modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = if (tv) 0.dp else 16.dp, vertical = 12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = MaterialTheme.shapes.large,
+                .padding(horizontal = if (tv) 0.dp else 16.dp, vertical = 12.dp)
+                .glass(),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -771,8 +783,9 @@ private fun OverviewContent(
                         contentColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.onSecondaryContainer
                             else MaterialTheme.colorScheme.onPrimary,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus().focusRequester(startFocus)
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus(CircleShape, focusScale = 1f).focusRequester(startFocus)
                 ) {
                     Icon(
                         imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,

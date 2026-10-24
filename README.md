@@ -1,113 +1,79 @@
-# Shield AirPlay
+# AirPlay Receiver (glass)
 
-[![CI](https://github.com/ebreen/shield-airplay/actions/workflows/ci.yml/badge.svg)](https://github.com/ebreen/shield-airplay/actions/workflows/ci.yml)
-[![GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/ebreen/shield-airplay)](https://github.com/ebreen/shield-airplay/releases/latest)
+An AirPlay receiver for Android TV with a clean, Apple-style Liquid Glass interface. Show your iPhone, iPad or Mac
+screen on the TV, with sound. No Apple TV needed.
 
-A free, open-source AirPlay receiver tuned for NVIDIA Shield and Android TV. It has no subscriptions, advertisements, analytics, in-app purchases, or artificial feature gates.
+<p>
+<img src="screenshots/overview-light.jpg" width="49%" alt="Overview, light theme">
+<img src="screenshots/overview-dark.jpg" width="49%" alt="Overview, dark theme">
+</p>
+<p>
+<img src="screenshots/settings-light.jpg" width="49%" alt="Settings, light theme">
+<img src="screenshots/settings-dark.jpg" width="49%" alt="Settings, dark theme, Advanced section">
+</p>
 
-Shield AirPlay is an independently maintained GPLv3 derivative of [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server), which uses [UxPlay](https://github.com/FDH2/UxPlay) for AirPlay/RAOP protocol support.
+This is a fork of [Shield AirPlay](https://github.com/ebreen/shield-airplay) by ebreen, which is itself a derivative of
+[android-airplay-server](https://github.com/jqssun/android-airplay-server) by jqssun and uses
+[UxPlay](https://github.com/FDH2/UxPlay) for the AirPlay protocol. The AirPlay engine is unchanged. What this fork
+changes is the interface and the defaults. See [CHANGES.md](CHANGES.md).
 
-## Features
+> Not affiliated with Apple. "AirPlay" is a trademark of Apple Inc.
 
-- iPhone, iPad, and Mac screen mirroring
-- AirPlay URL/HLS video playback with Shield remote controls
-- AAC-ELD, AAC-LC, and ALAC audio playback
-- H.264 and H.265/HEVC hardware decoding
-- Music metadata, artwork, and Android media-session controls
-- Android TV directional-pad navigation and Picture-in-Picture
-- **System, Light, and Dark app themes** with live switching
-- Optional four-digit AirPlay PIN
-- Automatic startup after boot
-- Foreground-service operation and process-death recovery
-- ARM64 and ARMv7 native libraries
-- Privacy-safe media URL logging
+## What is different
 
-## Install on NVIDIA Shield
+- **New interface.** Frosted glass panels over a blurred wallpaper, in white, black and grey only (no accent colour),
+  Outfit font, light and dark themes, large focus rings that are never clipped.
+- **Minimal settings.** The first screen has only what most people need: the receiver name, start at boot, run in
+  background, require a PIN, open on connect and the theme. Everything else is under **Advanced**.
+- **Stable mirroring by default.** "Advertise AirPlay video support" is **off** out of the box. On the TV this was
+  tested on, YouTube on the iPhone tried to hand its video to the TV, that failed and dropped the whole mirror. With
+  video support off the iPhone keeps mirroring instead. The trade-off: the small AirPlay button inside a video app
+  plays sound only; use **Control Center, Screen Mirroring** for the picture. You can turn it back on under
+  **Advanced, Compatibility**.
+- **Own app id** (`com.minimaltv.airplay`, label "AirPlay Receiver"), so it installs next to the original.
+  Do not run both at once: they use the same port.
 
-1. Download `Shield-AirPlay-*.apk` from the [latest release](https://github.com/ebreen/shield-airplay/releases/latest).
-2. Sideload it with a file manager or ADB:
+## Install
 
-   ```bash
-   adb install -r Shield-AirPlay-1.1.0-shield.apk
-   ```
+Easiest: use the installer script in [airplay-tv](https://github.com/AmalDamodar/airplay-tv), which also grants the
+permissions and has a beginner guide for the TV and computer side.
 
-3. Open **Shield AirPlay** once. Allow **Display over other apps** if you want incoming AirPlay sessions to open automatically.
-4. Keep the iPhone and Shield on the same LAN. AirPlay discovery uses multicast DNS; ordinary Tailscale connections do not transport mDNS.
-5. On the iPhone, use **Control Center → Screen Mirroring → Shield AirPlay**.
+Or by hand, with the TV's debugging switched on and `adb` connected:
 
-The receiver starts at boot by default. Its settings let you change the receiver name, PIN requirement, codecs, display mode, theme, and background behavior.
-
-## Limitations
-
-- DRM-protected video, including protected Apple TV content, is not supported.
-- AirPlay 2 multi-room audio is not implemented.
-- The sender and receiver normally need the same multicast-capable LAN.
-- UxPlay uses a reverse-engineered FairPlay compatibility component. UxPlay describes its legal status as unclear. Review the laws that apply where you use or distribute this software.
-
-## Build from source
-
-Clone with submodules:
-
-```bash
-git clone --recurse-submodules https://github.com/ebreen/shield-airplay.git
-cd shield-airplay
+```sh
+adb install AirPlay-Receiver-glass.apk        # from the Releases page
+adb shell appops set com.minimaltv.airplay SYSTEM_ALERT_WINDOW allow
+adb shell dumpsys deviceidle whitelist +com.minimaltv.airplay
 ```
 
-### Reproducible Docker builder
+Open the app once. On the iPhone: **Control Center, Screen Mirroring, pick the TV's name** (the default name is "TV";
+change it under Settings, Receiver). Both devices must be on the same Wi-Fi.
 
-```bash
-docker build --pull=false -t shield-airplay-builder docker
+Not supported: DRM-protected video (Netflix, Disney+, Apple TV+), AirPlay 2 multi-room. Tested on one Xiaomi Mi TV
+(Android 10) with an iPhone, mirroring YouTube, Shorts and other videos with sound.
 
-docker run --rm --user "$(id -u):$(id -g)" \
-  -e HOME=/tmp \
-  -e GRADLE_USER_HOME=/gradle-cache \
-  -v "$PWD:/workspace" \
-  -v "$HOME/.cache/shield-airplay-gradle:/gradle-cache" \
-  -w /workspace \
-  shield-airplay-builder \
-  ./gradlew testDebugUnitTest lintRelease assembleDebug \
-    --no-daemon --max-workers=2 \
-    '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8'
+## Build
+
+You need JDK 17 and the Android SDK (Gradle downloads the rest). The native AirPlay engine is not rebuilt by default;
+its prebuilt libraries come from the official upstream release:
+
+```sh
+tools/fetch-native-libs.sh          # downloads, checks the checksum, unpacks the libraries
+./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+For a signed release put `storeFile`, `storePassword`, `keyAlias` and `keyPassword` in `local.properties`
+(never commit it) and run `./gradlew :app:assembleRelease`.
 
-For a signed release, create a keystore outside the repository and add these ignored entries to `local.properties`:
+To compile the engine from source with the NDK instead, check out the submodules and pass `-PbuildNative`
+(`git submodule update --init --recursive`, then `./gradlew :app:assembleRelease -PbuildNative`). I did not test this
+path; upstream's [build notes](docs/UPSTREAM-README.md) and `SHIELD_BUILD.md` describe it.
 
-```properties
-storeFile=/absolute/path/outside/repository/release.jks
-storePassword=...
-keyAlias=...
-keyPassword=...
-```
+## Legal
 
-Then run the separate test, lint, and release commands in [SHIELD_BUILD.md](SHIELD_BUILD.md). Never commit the keystore or `local.properties`.
-
-> The Gradle native build temporarily applies patches inside the UxPlay submodule. Reset that generated worktree state after a build with `git -C app/src/main/cpp/third_party/UxPlay reset --hard HEAD`.
-
-## Development
-
-Read [AGENTS.md](AGENTS.md) before making changes. It documents the architecture, privacy and lifecycle invariants, test commands, release checks, and device acceptance matrix.
-
-Important source areas:
-
-- `AirPlayService.kt`: foreground service, callbacks, media session, receiver lifecycle
-- `MainViewModel.kt`: UI state, persistent settings, player controls
-- `ui/`: Compose UI, TV focus, video controls, themes
-- `renderer/`: MediaCodec and Media3 playback
-- `app/src/main/cpp/`: JNI bridge, UxPlay patches, native protocol integration
-
-## Licence and credits
-
-Shield AirPlay is licensed under the [GNU General Public License v3.0](LICENSE). Modified versions must remain GPL-compatible and make corresponding source available.
-
-Major upstream work belongs to the contributors of:
-
-- [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server)
-- [UxPlay](https://github.com/FDH2/UxPlay)
-- [FFmpeg](https://ffmpeg.org)
-- [libplist](https://github.com/libimobiledevice/libplist)
-- [Next Player](https://github.com/anilbeesetti/nextplayer)
-
-This project is not affiliated with Apple Inc. AirPlay, iPhone, iPad, Mac, Apple TV, and related marks belong to Apple Inc.
+- Licence: GNU GPL v3, see [LICENSE](LICENSE). Complete corresponding source: this repository, plus the pinned
+  submodules (UxPlay, FFmpeg, libplist, openssl-cmake) at the revisions in `SOURCE_REVISIONS.json`. The prebuilt native
+  libraries in releases are the unmodified ones from upstream's `v2.0.1-shield` release.
+- Upstream warns that UxPlay uses a reverse-engineered FairPlay compatibility component whose legal status is unclear.
+  Check the laws that apply where you live.
+- Fonts and images: see [NOTICE](NOTICE).

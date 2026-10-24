@@ -7,7 +7,7 @@ object Prefs {
     const val NAME = "settings"
     const val AUTO = "auto"; const val ON = "on"; const val OFF = "off"
 
-    const val SERVER_NAME = "server_name"; const val DEF_SERVER_NAME = "Shield AirPlay"
+    const val SERVER_NAME = "server_name"; const val DEF_SERVER_NAME = "TV"
     const val FALLBACK_MAC_ADDRESS = "fallback_mac_address"
     const val SERVER_PORT = "server_port"; const val DEF_SERVER_PORT = 7000
     const val AUTO_START = "auto_start"; const val DEF_AUTO_START = true
@@ -43,7 +43,7 @@ object Prefs {
     const val IDLE_PREVIEW = "idle_preview"; const val DEF_IDLE_PREVIEW = false
     const val AUTO_FULLSCREEN = "auto_fullscreen"; const val DEF_AUTO_FULLSCREEN = true
     const val KEEP_SCREEN_ON = "keep_screen_on"; const val DEF_KEEP_SCREEN_ON = true
-    const val ADVERTISE_VIDEO = "advertise_video"; const val DEF_ADVERTISE_VIDEO = true
+    const val ADVERTISE_VIDEO = "advertise_video"; const val DEF_ADVERTISE_VIDEO = false
     const val ADVERTISE_AUDIO = "advertise_audio"; const val DEF_ADVERTISE_AUDIO = true
     const val LAUNCH_ON_CONNECT = "launch_on_connect"; const val DEF_LAUNCH_ON_CONNECT = true
     const val THEME_MODE = "theme_mode"; const val DEF_THEME_MODE = "system"

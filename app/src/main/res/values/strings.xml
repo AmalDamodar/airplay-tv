@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Shield AirPlay</string>
+    <string name="app_name">AirPlay Receiver</string>
 
     <!-- Notification -->
     <string name="notification_channel">AirPlay Service</string>
-    <string name="notification_title">Shield AirPlay Running</string>
+    <string name="notification_title">AirPlay receiver running</string>
     <string name="notification_text">Accepting AirPlay connections</string>
     <string name="notification_pin_title">AirPlay PIN Required</string>
     <string name="notification_pin_text">PIN: %1$s</string>
@@ -28,10 +28,10 @@
     <string name="unknown_track">Unknown</string>
     <string name="ready_label">Ready</string>
     <string name="receiver_ready_title">Ready for AirPlay</string>
-    <string name="receiver_cast_help">Open Control Center → Screen Mirroring on your iPhone, or the AirPlay button in a video app. Choose %1$s.</string>
+    <string name="receiver_cast_help">Open Control Center on your iPhone, tap Screen Mirroring and choose %1$s.</string>
     <string name="receiver_network_help">Connect both devices to the same Wi-Fi or local network.</string>
     <string name="now_playing_label">Now playing</string>
-    <string name="settings_intro">Connection, playback and appearance</string>
+    <string name="settings_intro">Name, connection and appearance</string>
     <string name="logs_intro">Receiver activity and diagnostics</string>
     <string name="logs_empty">No activity yet. Receiver events will appear here.</string>
     <string name="time_separator">\u0020/\u0020</string>
@@ -82,11 +82,19 @@
     <string name="export_logs_chooser_title">Export logs</string>
 
     <!-- Settings sections -->
-    <string name="section_server">Server</string>
+    <string name="section_server">Receiver</string>
     <string name="section_connection">Connection</string>
     <string name="section_display">Display</string>
     <string name="section_decode">Decode</string>
     <string name="section_developer">Developer</string>
+    <string name="section_appearance">Appearance</string>
+    <string name="section_advanced">Advanced</string>
+    <string name="section_advanced_desc">Compatibility, display, decoding, audio sync and diagnostics</string>
+    <string name="section_compat">Compatibility</string>
+    <string name="section_compat_note">Video support is off by default: the iPhone then mirrors the screen instead of handing videos to the TV, which keeps YouTube and Shorts from dropping the connection. The AirPlay button inside a video app then plays sound only.</string>
+    <string name="section_network">Server and network</string>
+    <string name="section_audio_sync">Audio sync</string>
+    <string name="section_diagnostics">Diagnostics</string>
 
     <!-- Settings: Server -->
     <string name="setting_server_name">Server name</string>
@@ -106,7 +114,7 @@
 
     <!-- Settings: Display -->
     <string name="setting_theme">App theme</string>
-    <string name="setting_theme_desc">Choose the appearance of the Shield AirPlay interface</string>
+    <string name="setting_theme_desc">Choose the appearance of the interface</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>

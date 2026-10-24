@@ -8,6 +8,10 @@ plugins {
 
 import java.util.Properties
 
+// The native AirPlay engine is unchanged from the upstream release. By default its prebuilt libraries are used
+// (run tools/fetch-native-libs.sh once). Pass -PbuildNative to compile it from source with the NDK instead.
+val prebuiltNative = file("src/main/jniLibs").exists() && !project.hasProperty("buildNative")
+
 val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
@@ -17,7 +21,7 @@ val allAbis = listOf("arm64-v8a", "armeabi-v7a")
 android {
     namespace = "io.github.jqssun.airplay"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    if (!prebuiltNative) ndkVersion = "27.0.12077973"
 
     if (localProps.containsKey("storeFile")) {
         signingConfigs {
@@ -31,24 +35,32 @@ android {
     }
 
     defaultConfig {
-        applicationId = "no.gior.shieldairplay"
+        applicationId = "com.minimaltv.airplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 201
-        versionName = "2.0.1-shield"
+        versionCode = 301
+        versionName = "2.0.1-glass.1"
 
-        externalNativeBuild {
-            cmake {
-                arguments += "-DANDROID_STL=c++_shared"
-                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        if (!prebuiltNative) {
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DANDROID_STL=c++_shared"
+                    arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                }
             }
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
+    if (!prebuiltNative) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+            }
         }
+    }
+
+    packaging {
+        jniLibs.pickFirsts += listOf("**/liboboe.so", "**/libc++_shared.so")
     }
 
     buildTypes {

@@ -31,7 +31,7 @@ import io.github.jqssun.airplay.service.AirPlayService.ServerState
 @Composable
 internal fun ReceiverStatus(state: ServerState, connections: Int = 0) {
     val color = when (state) {
-        ServerState.RUNNING -> MaterialTheme.colorScheme.tertiary
+        ServerState.RUNNING -> MaterialTheme.colorScheme.onSurface
         ServerState.ERROR -> MaterialTheme.colorScheme.error
         ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -61,8 +61,7 @@ internal fun ReceiverHero(name: String, state: ServerState) {
     val tv = isTv()
     // Scroll only on compact/tall-text layouts; no focusable decoration competes with Start.
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-            .padding(if (tv) 24.dp else 20.dp)
+        Modifier.fillMaxSize().padding(if (tv) 24.dp else 20.dp)
     ) {
         val wide = maxWidth >= 540.dp
         val glyph: @Composable () -> Unit = {
