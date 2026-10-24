@@ -15,3 +15,10 @@ code are unchanged.
 - Build: native libraries can be taken from the upstream release (`tools/fetch-native-libs.sh`) instead of compiling
   them; `-PbuildNative` keeps the original CMake build.
 - Upstream README moved to `docs/UPSTREAM-README.md`.
+
+## 2.0.1-glass.2
+
+- Focus style: the selected element is lit like a pane of glass (brighter translucent fill, thin specular edge, faint
+  glow) instead of a hard outline (`ui/TvFocus.kt`, colours in `ui/Glass.kt`).
+- Status chip: the dot glows green (ready or connected), yellow and breathing (a device is connecting) or red (stopped
+  or error); new string `connecting_label`.
