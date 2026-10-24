@@ -46,7 +46,7 @@ Details and what was ruled out: [docs/SETTINGS.md](docs/SETTINGS.md).
 
 | TV | Works? |
 | --- | --- |
-| Android TV or Google TV (Sony, TCL, Xiaomi, Philips, Hisense, Nvidia Shield, many others), Android 7 or newer | Should. Tested on **one** TV only: Xiaomi MiTV-MOOQ0, Android 10. Mirroring from an iPhone, including YouTube with sound, was tested with this exact build (2.0.1-tv.1) on that TV |
+| Android TV or Google TV (Sony, TCL, Xiaomi, Philips, Hisense, Nvidia Shield, many others), Android 7 or newer | Should. Tested on **one** TV only: Xiaomi MiTV-MOOQ0, Android 10. Mirroring from an iPhone, including YouTube with sound, was tested on that TV with version 2.0.1; version 2.1.0 adds file receiving and browsing and leaves the mirroring engine unchanged. Receiving files was tested from an iPhone and a Mac browser, the Files tab with the remote |
 | Fire TV | Probably, since it runs Android, but untested. Fire TV has its own adb switch under **Settings, My Fire TV, Developer options** |
 | Samsung (Tizen), LG (webOS), Roku | No. They are not Android TV and cannot run this app. Many newer models already have AirPlay built in, check your TV's settings |
 
