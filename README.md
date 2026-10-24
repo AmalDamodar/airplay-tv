@@ -5,7 +5,7 @@ screen on the TV, with sound. No Apple TV needed.
 
 <p>
 <img src="screenshots/overview.jpg" width="49%" alt="Overview: the status dot glows green when the receiver is ready">
-<img src="screenshots/settings.jpg" width="49%" alt="Settings: the focused option is lit like a pane of glass">
+<img src="screenshots/settings.jpg" width="49%" alt="Settings: the selected row gets a soft highlight">
 </p>
 
 This is a fork of [Shield AirPlay](https://github.com/ebreen/shield-airplay) by ebreen, which is itself a derivative of
@@ -18,7 +18,7 @@ changes is the interface and the defaults. See [CHANGES.md](CHANGES.md).
 ## What is different
 
 - **New interface.** Frosted glass panels over a blurred wallpaper, Outfit font, light and dark themes. The option you
-  have selected is lit like a pane of glass (no hard outline) and is never clipped. The status dot glows green when the
+  have selected gets one soft highlight, nothing else (the menu icons use a small pill). The status dot glows green when the
   receiver is ready or streaming, yellow while a device is connecting, and red when stopped or in error.
 - **Minimal settings.** The first screen has only what most people need: the receiver name, start at boot, run in
   background, require a PIN, open on connect and the theme. Everything else is under **Advanced**.

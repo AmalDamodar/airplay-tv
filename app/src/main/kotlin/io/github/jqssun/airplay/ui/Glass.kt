@@ -37,14 +37,8 @@ data class GlassColors(
     val textDim: Color,
     val scrim: Color,
     val wallpaper: Int,
-    // focus: a lit pane of glass
-    val focusFillTop: Color,
-    val focusFillBottom: Color,
-    val focusEdgeTop: Color,
-    val focusEdgeBottom: Color,
-    val focusHairline: Color,
-    val focusGlow: Color,
-    val focusGlowAlpha: Float,
+    // the selected row or button: one soft fill, nothing else
+    val focusFill: Color,
 )
 
 val DarkGlass = GlassColors(
@@ -59,13 +53,7 @@ val DarkGlass = GlassColors(
     textDim = Color(0xB3FFFFFF),
     scrim = Color(0x59000000),
     wallpaper = R.drawable.glass_bg_dark,
-    focusFillTop = Color(0x52FFFFFF),
-    focusFillBottom = Color(0x33FFFFFF),
-    focusEdgeTop = Color(0xCCFFFFFF),
-    focusEdgeBottom = Color(0x4DFFFFFF),
-    focusHairline = Color(0x00000000),
-    focusGlow = Color.White,
-    focusGlowAlpha = 0.16f,
+    focusFill = Color(0x2EFFFFFF),
 )
 
 val LightGlass = GlassColors(
@@ -80,13 +68,7 @@ val LightGlass = GlassColors(
     textDim = Color(0x99111114),
     scrim = Color(0x26FFFFFF),
     wallpaper = R.drawable.glass_bg_light,
-    focusFillTop = Color(0xF5FFFFFF),
-    focusFillBottom = Color(0xE0FFFFFF),
-    focusEdgeTop = Color.White,
-    focusEdgeBottom = Color(0x99FFFFFF),
-    focusHairline = Color(0x14000000),
-    focusGlow = Color(0xFF1A1A2E),
-    focusGlowAlpha = 0.09f,
+    focusFill = Color(0x1F000000),
 )
 
 val LocalGlass = staticCompositionLocalOf { DarkGlass }

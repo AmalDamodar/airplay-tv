@@ -590,8 +590,7 @@ fun MainScreen(
                                 icon = { Icon(t.icon, null) },
                                 label = { Text(stringResource(t.labelRes)) },
                                 colors = glassNavColors(),
-                                modifier = Modifier.padding(vertical = 6.dp).dpadFocus(RoundedCornerShape(28.dp), focusScale = 1f)
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(vertical = 6.dp),
                             )
                         }
                     }
@@ -788,7 +787,7 @@ private fun OverviewContent(
                     ),
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
-                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus(CircleShape, focusScale = 1f).focusRequester(startFocus)
+                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus(CircleShape, focusScale = 1.06f).focusRequester(startFocus)
                 ) {
                     Icon(
                         imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,

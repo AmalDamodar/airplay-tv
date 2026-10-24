@@ -22,3 +22,10 @@ code are unchanged.
   glow) instead of a hard outline (`ui/TvFocus.kt`, colours in `ui/Glass.kt`).
 - Status chip: the dot glows green (ready or connected), yellow and breathing (a device is connecting) or red (stopped
   or error); new string `connecting_label`.
+
+## 2.0.1-glass.3
+
+- Simpler selection: a single soft rounded fill behind the focused row or button, no outline, glow or scaling (the
+  Start/Stop button grows slightly). The menu icons use only the pill behind the icon.
+- The default Android click overlay (a rectangle behind settings rows) is switched off for rows, toggles and the theme
+  control.

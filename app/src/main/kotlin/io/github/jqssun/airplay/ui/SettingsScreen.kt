@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -145,6 +146,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .dpadFocus(FocusShape, focusScale = 1f)
                         .toggleable(
+                            interactionSource = remember { MutableInteractionSource() }, indication = null,
                             value = launchOnConnect,
                             role = Role.Switch,
                             onValueChange = {
@@ -490,7 +492,7 @@ private fun SettingsRow(
 @Composable
 private fun AdvancedHeader(open: Boolean, onToggle: () -> Unit) {
     SettingsRow(
-        modifier = Modifier.dpadFocus(FocusShape, focusScale = 1f).clickable(onClick = onToggle),
+        modifier = Modifier.dpadFocus(FocusShape, focusScale = 1f).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onToggle),
         headlineContent = { Text(stringResource(R.string.section_advanced)) },
         supportingContent = { Text(stringResource(R.string.section_advanced_desc)) },
         trailingContent = {
@@ -553,7 +555,10 @@ private fun <T> GlassSegmented(options: List<Pair<T, String>>, selected: T, onSe
                     .dpadFocus(CircleShape, focusScale = 1f)
                     .clip(CircleShape)
                     .background(if (chosen) g.pill else Color.Transparent)
-                    .selectable(selected = chosen, role = Role.RadioButton, onClick = { onSelect(value) })
+                    .selectable(
+                        selected = chosen, role = Role.RadioButton, onClick = { onSelect(value) },
+                        interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    )
                     .padding(horizontal = 22.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -820,7 +825,10 @@ private fun SettingSwitch(
     SettingsRow(
         modifier = Modifier
             .dpadFocus(FocusShape, focusScale = 1f)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+            .toggleable(
+                interactionSource = remember { MutableInteractionSource() }, indication = null,
+                value = checked, role = Role.Switch, onValueChange = onCheckedChange,
+            ),
         headlineContent = { Text(title) },
         supportingContent = { Text(description) },
         trailingContent = { Switch(checked = checked, onCheckedChange = null, colors = glassSwitchColors()) }
