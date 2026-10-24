@@ -109,6 +109,17 @@ object FileReceiver {
         state.update { it.copy(running = false, current = null) }
     }
 
+    /** Takes a file off the list; the file itself stays on the TV. */
+    fun remove(r: Received) = state.update { it.copy(received = it.received - r) }
+
+    /** Deletes the file from the TV's storage and takes it off the list. A file that is already gone counts as deleted. */
+    fun deleteFile(ctx: Context, r: Received): Boolean {
+        val uri = r.uri ?: return false
+        val ok = try { ctx.contentResolver.delete(uri, null, null) >= 0 } catch (_: Exception) { false }
+        if (ok) remove(r)
+        return ok
+    }
+
     /** Re-reads the address, for when the network changed while the screen was open. */
     fun refreshAddress() {
         if (server != null) state.update { it.copy(address = localAddress()) }

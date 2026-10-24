@@ -224,5 +224,14 @@
     <string name="files_none">Nothing received yet</string>
     <string name="files_receiving">Receiving %1$s</string>
     <string name="files_open">Open</string>
+    <string name="files_open_folder">Show in folder</string>
+    <string name="files_delete">Delete</string>
+    <string name="files_delete_title">Delete %1$s?</string>
+    <string name="files_delete_text">Delete the file from the TV, or only take it off this list and keep the file.</string>
+    <string name="files_delete_file">Delete file</string>
+    <string name="files_delete_list">Remove from list</string>
+    <string name="files_deleted">File deleted</string>
+    <string name="files_delete_failed">Could not delete the file</string>
+    <string name="files_no_file_manager">No file manager app on this TV. The file is in Downloads, in the folder AirPlay TV</string>
     <string name="files_cannot_open">No app on this TV can open this file</string>
 </resources>
