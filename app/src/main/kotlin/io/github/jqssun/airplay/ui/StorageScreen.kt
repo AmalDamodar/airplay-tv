@@ -24,13 +24,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,8 +56,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.jqssun.airplay.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.text.DateFormat
 import java.util.Date
 
@@ -97,6 +104,82 @@ private fun deletePath(ctx: Context, target: File): Boolean {
     return ok
 }
 
+
+/** A copy or move waiting for a destination folder. */
+private class Clip(val file: File, val move: Boolean)
+
+/** "name (1).ext" style name that does not exist in [dir] yet. */
+private fun uniqueTarget(dir: File, name: String): File {
+    var target = File(dir, name)
+    if (!target.exists()) return target
+    val base = name.substringBeforeLast('.', name)
+    val ext = name.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
+    var n = 1
+    while (target.exists() && n < 10_000) { target = File(dir, "$base ($n)$ext"); n++ }
+    return target
+}
+
+private fun treeSize(f: File): Long = if (f.isFile) f.length() else f.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+
+/** Copies a file or folder, reporting bytes as they go; stops early when [cancel] is set. */
+private fun copyTree(src: File, dst: File, cancel: AtomicBoolean, onBytes: (Long) -> Unit) {
+    if (src.isDirectory) {
+        dst.mkdirs()
+        src.listFiles()?.forEach { if (!cancel.get()) copyTree(it, File(dst, it.name), cancel, onBytes) }
+    } else {
+        src.inputStream().use { input ->
+            dst.outputStream().use { output ->
+                val buf = ByteArray(256 * 1024)
+                while (!cancel.get()) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    output.write(buf, 0, n)
+                    onBytes(n.toLong())
+                }
+            }
+        }
+    }
+}
+
+private fun pathsIn(f: File): List<String> =
+    if (f.isDirectory) f.walkTopDown().filter { it.isFile }.take(5000).map { it.absolutePath }.toList() else listOf(f.absolutePath)
+
+/** Tells the media database about changed files so it shows no ghost entries. */
+private fun rescan(ctx: Context, paths: List<String>) {
+    if (paths.isNotEmpty()) MediaScannerConnection.scanFile(ctx, paths.take(5000).toTypedArray(), null, null)
+}
+
+/** Copies or moves [clip] into [dir]. Returns the new file, or null if it failed or was cancelled. */
+private fun paste(ctx: Context, clip: Clip, dir: File, cancel: AtomicBoolean, onProgress: (Float) -> Unit): File? {
+    val src = clip.file
+    val target = uniqueTarget(dir, src.name)
+    val before = pathsIn(src)
+    if (clip.move && src.renameTo(target)) {
+        rescan(ctx, before + pathsIn(target))
+        return target
+    }
+    val total = treeSize(src).coerceAtLeast(1L)
+    var done = 0L
+    try {
+        copyTree(src, target, cancel) { done += it; onProgress(done.toFloat() / total) }
+    } catch (_: Exception) {
+        target.deleteRecursively()
+        return null
+    }
+    if (cancel.get()) { target.deleteRecursively(); return null }
+    if (clip.move) src.deleteRecursively()
+    rescan(ctx, before + pathsIn(target))
+    return target
+}
+
+private fun renameTo(ctx: Context, file: File, newName: String): File? {
+    val target = File(file.parentFile, newName)
+    val before = pathsIn(file)
+    if (!file.renameTo(target)) return null
+    rescan(ctx, before + pathsIn(target))
+    return target
+}
+
 /**
  * A small file manager: internal storage and USB drives, folders first, driven entirely with the remote.
  * OK opens a folder or a file, Back goes up one level, the trash button (to the right of a row) deletes after asking.
@@ -108,8 +191,11 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var granted by remember { mutableStateOf(hasStorageAccess(ctx)) }
+    var resumed by remember { mutableStateOf(0) }
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) granted = hasStorageAccess(ctx) }
+        val observer = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_RESUME) { granted = hasStorageAccess(ctx); resumed++ }
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -126,6 +212,13 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
     var refresh by remember { mutableStateOf(0) }
     var comeFrom by remember { mutableStateOf<String?>(null) }
     var toDelete by remember { mutableStateOf<Entry?>(null) }
+    var menuFor by remember { mutableStateOf<Entry?>(null) }
+    var renaming by remember { mutableStateOf<Entry?>(null) }
+    var clip by remember { mutableStateOf<Clip?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf(0f) }
+    val cancel = remember { AtomicBoolean(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(startAt) {
         if (startAt != null) { current = startAt; comeFrom = null; onStartConsumed() }
@@ -144,7 +237,7 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
     }
     BackHandler(enabled = canGoUp) { goUp() }
 
-    val entries by produceState<List<Entry>?>(initialValue = null, folder, refresh) {
+    val entries by produceState<List<Entry>?>(initialValue = null, folder, refresh, resumed) {
         value = null
         value = withContext(Dispatchers.IO) {
             if (folder == null) {
@@ -166,6 +259,33 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        clip?.let { c ->
+            PasteBar(
+                clip = c, busy = busy, progress = progress,
+                canPaste = folder != null && !busy,
+                onPaste = {
+                    val dest = folder ?: return@PasteBar
+                    val src = c.file
+                    val inside = dest.canonicalPath == src.canonicalPath || dest.canonicalPath.startsWith(src.canonicalPath + "/")
+                    if (inside && src.isDirectory) {
+                        Toast.makeText(ctx, R.string.storage_into_itself, Toast.LENGTH_LONG).show()
+                    } else if (c.move && dest.canonicalPath == src.parentFile?.canonicalPath) {
+                        Toast.makeText(ctx, R.string.storage_same_folder, Toast.LENGTH_SHORT).show()
+                        clip = null
+                    } else {
+                        busy = true; progress = 0f; cancel.set(false)
+                        scope.launch {
+                            val made = withContext(Dispatchers.IO) { paste(ctx, c, dest, cancel) { progress = it } }
+                            busy = false
+                            if (made != null) { clip = null; comeFrom = made.name; refresh++ }
+                            else Toast.makeText(ctx, if (cancel.get()) R.string.storage_cancelled else R.string.storage_op_failed, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                onCancel = { if (busy) cancel.set(true) else clip = null },
             )
         }
 
@@ -197,14 +317,43 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
                                     if (e.isDir) { comeFrom = null; current = e.file }
                                     else openFile(ctx, e.file)
                                 },
-                                // the volume list and the standard top-level folders (Download, DCIM, Android ...) cannot be deleted from here
-                                onDelete = if (folder == null || (e.isDir && e.file.parentFile == internal)) null else ({ toDelete = e }),
+                                onMore = if (folder == null) null else ({ menuFor = e }),
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    menuFor?.let { e ->
+        // the standard top-level folders (Download, DCIM, Android ...) can only be copied
+        val protected = e.isDir && e.file.parentFile == internal
+        ActionMenu(
+            name = e.file.name,
+            protected = protected,
+            enabled = !busy,
+            onCopy = { menuFor = null; clip = Clip(e.file, move = false) },
+            onMove = { menuFor = null; clip = Clip(e.file, move = true) },
+            onRename = { menuFor = null; renaming = e },
+            onDelete = { menuFor = null; toDelete = e },
+            onDismiss = { menuFor = null },
+        )
+    }
+
+    renaming?.let { e ->
+        TextEditDialog(
+            label = stringResource(R.string.storage_rename),
+            initial = e.file.name,
+            range = null,
+            validate = { n -> val t = n.trim(); t.isNotEmpty() && !t.contains('/') && (t == e.file.name || !File(e.file.parentFile, t).exists()) },
+            onDismiss = { renaming = null },
+            onConfirm = { n ->
+                val made = renameTo(ctx, e.file, n.trim())
+                if (made != null) { comeFrom = made.name; refresh++ }
+                else Toast.makeText(ctx, R.string.storage_op_failed, Toast.LENGTH_LONG).show()
+            },
+        )
     }
 
     toDelete?.let { e ->
@@ -241,8 +390,93 @@ fun StorageScreen(startAt: File?, onStartConsumed: () -> Unit) {
     }
 }
 
+/** The "..." menu of a row: Copy, Move, Rename, Delete (last). */
 @Composable
-private fun EntryRow(e: Entry, modifier: Modifier, onOpen: () -> Unit, onDelete: (() -> Unit)?) {
+private fun ActionMenu(
+    name: String, protected: Boolean, enabled: Boolean,
+    onCopy: () -> Unit, onMove: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit,
+) {
+    val first = remember { FocusRequester() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        title = { Text(name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MenuItem(stringResource(R.string.storage_copy), Icons.Default.ContentCopy, enabled, Modifier.focusRequester(first), onCopy)
+                if (!protected) {
+                    MenuItem(stringResource(R.string.storage_move), Icons.Default.DriveFileMove, enabled, Modifier, onMove)
+                    MenuItem(stringResource(R.string.storage_rename), Icons.Default.DriveFileRenameOutline, enabled, Modifier, onRename)
+                    MenuItem(stringResource(R.string.files_delete), Icons.Default.DeleteOutline, enabled, Modifier, onDelete)
+                }
+            }
+        },
+        confirmButton = {},
+    )
+    LaunchedEffect(Unit) { first.requestFocusUntilLanded() }
+}
+
+@Composable
+private fun MenuItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .dpadFocus(RowShape, focusScale = 1f)
+            .clip(RowShape)
+            .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = g.textDim)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = if (enabled) g.text else g.textDim)
+    }
+}
+
+/** Shown while a copy or move waits for its destination: browse to the folder, then Paste here. */
+@Composable
+private fun PasteBar(clip: Clip, busy: Boolean, progress: Float, canPaste: Boolean, onPaste: () -> Unit, onCancel: () -> Unit) {
+    val g = LocalGlass.current
+    Row(
+        Modifier.fillMaxWidth().glass().padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(
+                    when { busy && clip.move -> R.string.storage_moving; busy -> R.string.storage_copying; clip.move -> R.string.storage_move_what; else -> R.string.storage_copy_what },
+                    clip.file.name,
+                ),
+                style = MaterialTheme.typography.bodyLarge, color = g.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            if (busy) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = g.text, trackColor = g.divider)
+            else Text(stringResource(R.string.storage_paste_hint), style = MaterialTheme.typography.bodySmall, color = g.textDim)
+        }
+        PillButton(stringResource(R.string.storage_paste), canPaste, onPaste)
+        PillButton(stringResource(android.R.string.cancel), true, onCancel)
+    }
+}
+
+@Composable
+private fun PillButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    Text(
+        label,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (enabled) g.text else g.textDim,
+        modifier = Modifier
+            .dpadFocus(CircleShape, focusScale = 1f)
+            .clip(CircleShape)
+            .background(g.pill)
+            .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 10.dp),
+    )
+}
+
+@Composable
+private fun EntryRow(e: Entry, modifier: Modifier, onOpen: () -> Unit, onMore: (() -> Unit)?) {
     val g = LocalGlass.current
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -268,7 +502,7 @@ private fun EntryRow(e: Entry, modifier: Modifier, onOpen: () -> Unit, onDelete:
             }
             if (e.isDir) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = g.textDim)
         }
-        if (onDelete != null) RowAction(stringResource(R.string.files_delete), Icons.Default.DeleteOutline) { onDelete() }
+        if (onMore != null) RowAction(stringResource(R.string.storage_more), Icons.Default.MoreVert) { onMore() }
     }
 }
 

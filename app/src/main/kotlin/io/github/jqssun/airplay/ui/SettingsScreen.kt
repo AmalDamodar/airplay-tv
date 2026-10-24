@@ -727,15 +727,16 @@ private fun SettingTextField(
 }
 
 @Composable
-private fun TextEditDialog(
+internal fun TextEditDialog(
     label: String,
     initial: String,
     range: IntRange?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    validate: (String) -> Boolean = { true },
 ) {
     var text by remember { mutableStateOf(initial) }
-    val valid = if (range == null) text.isNotBlank() else text.toIntOrNull()?.let { it in range } == true
+    val valid = (if (range == null) text.isNotBlank() else text.toIntOrNull()?.let { it in range } == true) && validate(text)
     val requester = remember { FocusRequester() }
     fun confirm() {
         if (!valid) return

@@ -72,3 +72,7 @@ code are unchanged.
 - Manifest: `READ/WRITE_EXTERNAL_STORAGE`, `MANAGE_EXTERNAL_STORAGE` (for Android 11+) and
   `requestLegacyExternalStorage` (honoured on Android 10). The file provider now covers any path, only to hand a file you
   opened to another app. Deleting also tells the media database, so no stale entries are left.
+- The row button is now "..." with Copy, Move, Rename and Delete (last). Copy and Move wait for a destination: open the
+  folder, then choose Paste here (a bar at the top shows what is waiting, with progress for big files and Cancel).
+  Names that already exist get " (1)". The standard top-level folders can only be copied. The list refreshes when the
+  app comes back to the front.

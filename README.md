@@ -157,8 +157,9 @@ the TV: a video in a video player, an APK in the system installer), **Show in fo
 
 The **Files** tab is a small file manager made for the remote: internal storage and USB drives, folders first, in the
 same glass style. **OK** opens a folder or a file (a video in a video player, an APK in the system installer),
-**Back** goes up one level, and the trash button to the right of a row deletes after asking (the question starts on
-Cancel). The standard top-level folders (Download, DCIM, Android and so on) cannot be deleted from here. The first time,
+**Back** goes up one level, and the **...** button to the right of a row offers **Copy**, **Move**, **Rename** and
+**Delete**. Copy and Move wait for a destination: open that folder, then choose **Paste here**. Delete asks first (the
+question starts on Cancel). The standard top-level folders (Download, DCIM, Android and so on) can only be copied. The first time,
 choose **Allow access**.
 
 On Android 10 TVs this works through the "legacy storage" setting. On Android 11 or newer the app needs the "all files
