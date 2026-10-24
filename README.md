@@ -1,6 +1,7 @@
 # AirPlay TV
 
-Show your iPhone, iPad or Mac screen on an Android TV, with sound, using AirPlay. No Apple TV needed.
+Show your iPhone, iPad or Mac screen on an Android TV, with sound, using AirPlay. No Apple TV needed. It can also
+receive files (movies, videos, photos, APK files) sent from a phone or computer, with nothing to install on the phone.
 
 This repository has the receiver app (a clean, Apple-style Liquid Glass interface on an open-source AirPlay engine),
 the installer scripts that put it on your TV, and a beginner guide. Mirroring settings that keep YouTube stable are
@@ -133,6 +134,19 @@ Check it:
 ```
 
 On the iPhone: **Control Center, Screen Mirroring, pick your TV's name.** Both devices must be on the same Wi-Fi.
+
+## Send files to the TV
+
+Open the **Files** tab in the app. The TV shows a QR code, an address (like `http://192.168.1.50:8765`) and a 4-digit PIN.
+On the iPhone, iPad or Mac, scan the code with the camera (or type the address in a browser on the same Wi-Fi), choose
+the files and wait until each one says Done. They are saved on the TV in **Downloads, in the folder AirPlay TV**.
+
+- Nothing to install on the phone or computer: it is a web page served by the TV.
+- Big files are fine: they are written straight to storage while they arrive (a 600 MB video was sent and compared
+  byte for byte). Speed is limited by your Wi-Fi; about 7.5 MB/s on the test TV, so a 2 GB movie takes about 5 minutes.
+- Only devices on your own network can connect, and every upload needs the PIN. Five wrong PINs lock that device out for
+  a minute. The receiver runs only while the Files tab is open; leave the tab and the port closes.
+- To install a received APK on the TV you need a file manager app on the TV that can open Downloads.
 
 ## What works, what does not
 

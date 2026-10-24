@@ -38,8 +38,8 @@ android {
         applicationId = "com.minimaltv.airplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 305
-        versionName = "2.0.1-tv.1"
+        versionCode = 306
+        versionName = "2.1.0"
 
         if (!prebuiltNative) {
             externalNativeBuild {
@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.media3.transformer)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.oboe)
+    implementation(libs.zxing.core)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

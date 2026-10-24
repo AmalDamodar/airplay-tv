@@ -41,3 +41,9 @@ code are unchanged.
 - Renamed to AirPlay TV (app label, release file `AirPlay-TV.apk`). The installer scripts and guides that lived in a
   separate repository (`airplay-tv`) are now in this one (`scripts/`, `docs/`).
 - No functional change to the receiver.
+
+## 2.1.0
+
+- New **Files** tab: receive files from a phone or computer in a browser (`files/FileReceiver.kt`, the page in
+  `assets/receive.html`, the screen in `ui/FilesScreen.kt`). QR code made with ZXing core (Apache License 2.0). Files go
+  to Downloads/AirPlay TV through MediaStore. The server runs only while the tab is open and needs the PIN shown on the TV.

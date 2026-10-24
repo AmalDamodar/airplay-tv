@@ -12,6 +12,7 @@
 
     <!-- Tabs -->
     <string name="tab_overview">Overview</string>
+    <string name="tab_files">Files</string>
     <string name="tab_logs">Logs</string>
     <string name="tab_settings">Settings</string>
 
@@ -209,4 +210,17 @@
     <string name="debug_audio_glitch">Glitch: trim=%1$d drop=%2$d sil=%3$d ur=%4$d xrun=%5$d</string>
     <string name="debug_audio_decode">Decode: %1$s</string>
     <string name="debug_clients">Clients: %1$d</string>
+
+    <!-- Receive files -->
+    <string name="files_title">Receive files</string>
+    <string name="files_intro">Send movies, videos, photos and APK files from an iPhone, iPad or Mac</string>
+    <string name="files_scan">Scan with the camera, or open this address in a browser on the same Wi-Fi</string>
+    <string name="files_pin">PIN</string>
+    <string name="files_pin_hint">Enter it on the phone if it asks</string>
+    <string name="files_saved_in">Saved in Downloads, in the folder AirPlay TV</string>
+    <string name="files_no_network">Not connected to Wi-Fi or Ethernet</string>
+    <string name="files_port_busy">Could not open the receiving port</string>
+    <string name="files_received">Received</string>
+    <string name="files_none">Nothing received yet</string>
+    <string name="files_receiving">Receiving %1$s</string>
 </resources>

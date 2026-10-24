@@ -9,4 +9,6 @@ Bundled fonts and images:
   the Unsplash licence (https://unsplash.com/license). The photographers of the set they were chosen from are Thomas
   Griesbeck, Niklas Jonasson, Linus Nylund, Atsadawut Chaiseeha, raouf bedrani and MagicPattern.
 
+ZXing core (https://github.com/zxing/zxing), Apache License 2.0, is used to draw the QR code on the Files tab.
+
 "AirPlay" is a trademark of Apple Inc. This project is not affiliated with or endorsed by Apple.
