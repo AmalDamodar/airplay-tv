@@ -29,3 +29,9 @@ code are unchanged.
   Start/Stop button grows slightly). The menu icons use only the pill behind the icon.
 - The default Android click overlay (a rectangle behind settings rows) is switched off for rows, toggles and the theme
   control.
+
+## 2.0.1-glass.4
+
+- Text settings (server name, port, buffer sizes) are plain rows that show the current value. OK opens a small dialog
+  to edit it. Before, an inline text box sat in the list: it took the D-pad keys (the cursor moved instead of the
+  focus) and brought up the on-screen keyboard over the list, which made the screen jump.

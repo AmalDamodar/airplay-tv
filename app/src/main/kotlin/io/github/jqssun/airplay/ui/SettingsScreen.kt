@@ -16,6 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
@@ -683,6 +692,10 @@ private fun doneAndHide(commit: () -> Unit): KeyboardActions {
     return KeyboardActions(onDone = { commit(); keyboard?.hide() })
 }
 
+/**
+ * A row showing the current value. OK opens a small edit dialog, so a text box never sits in the list
+ * and takes the D-pad keys away from scrolling.
+ */
 @Composable
 private fun SettingTextField(
     label: String,
@@ -691,31 +704,86 @@ private fun SettingTextField(
     description: String? = null,
     range: IntRange? = null
 ) {
-    var text by remember(value) { mutableStateOf(value) }
-    val valid = range == null || text.toIntOrNull()?.let { it in range } == true
-    fun save() {
-        if (valid && text != value) onCommit(text)
-    }
-    OutlinedTextField(
- colors = glassFieldColors(),
-        value = text,
-        onValueChange = { text = if (range == null) it else it.filter { c -> c.isDigit() }.take(6) },
-        label = { Text(label) },
-        supportingText = description?.let { { Text(it) } },
-        singleLine = true,
-        isError = !valid,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (range == null) KeyboardType.Text else KeyboardType.Number,
-            imeAction = ImeAction.Done
-        ),
-        keyboardActions = doneAndHide(::save),
+    var open by remember { mutableStateOf(false) }
+    SettingsRow(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 8.dp)
-            .onFocusChanged { if (!it.isFocused) save() }
             .dpadFocus(FocusShape, focusScale = 1f)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { open = true },
+        headlineContent = { Text(label) },
+        supportingContent = description?.let { { Text(it) } },
+        trailingContent = {
+            Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
     )
+    if (open) {
+        TextEditDialog(
+            label = label,
+            initial = value,
+            range = range,
+            onDismiss = { open = false },
+            onConfirm = onCommit,
+        )
+    }
+}
+
+@Composable
+private fun TextEditDialog(
+    label: String,
+    initial: String,
+    range: IntRange?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(initial) }
+    val valid = if (range == null) text.isNotBlank() else text.toIntOrNull()?.let { it in range } == true
+    val requester = remember { FocusRequester() }
+    fun confirm() {
+        if (!valid) return
+        if (text != initial) onConfirm(text)
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        title = { Text(label) },
+        text = {
+            // the dialog is its own window with its own focus manager, so ask for it here
+            val focus = LocalFocusManager.current
+            OutlinedTextField(
+                colors = glassFieldColors(),
+                value = text,
+                onValueChange = { text = if (range == null) it else it.filter { c -> c.isDigit() }.take(6) },
+                singleLine = true,
+                isError = !valid,
+                supportingText = range?.let { { Text("${it.first} - ${it.last}") } },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (range == null) KeyboardType.Text else KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { confirm() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(requester)
+                    // Down leaves the box for the buttons instead of moving the cursor
+                    .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                            focus.moveFocus(FocusDirection.Down); true
+                        } else false
+                    },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = ::confirm, enabled = valid, modifier = Modifier.dpadFocus(CircleShape)) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.dpadFocus(CircleShape)) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+    LaunchedEffect(Unit) { requester.requestFocusUntilLanded() }
 }
 
 @Composable
