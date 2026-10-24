@@ -35,3 +35,9 @@ code are unchanged.
 - Text settings (server name, port, buffer sizes) are plain rows that show the current value. OK opens a small dialog
   to edit it. Before, an inline text box sat in the list: it took the D-pad keys (the cursor moved instead of the
   focus) and brought up the on-screen keyboard over the list, which made the screen jump.
+
+## 2.0.1-tv.1
+
+- Renamed to AirPlay TV (app label, release file `AirPlay-TV.apk`). The installer scripts and guides that lived in a
+  separate repository (`airplay-tv`) are now in this one (`scripts/`, `docs/`).
+- No functional change to the receiver.
