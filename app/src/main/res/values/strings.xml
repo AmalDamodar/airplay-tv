@@ -216,11 +216,13 @@
     <string name="files_intro">Send movies, videos, photos and APK files from an iPhone, iPad or Mac</string>
     <string name="files_scan">Scan with the camera, or open this address in a browser on the same Wi-Fi</string>
     <string name="files_pin">PIN</string>
-    <string name="files_pin_hint">Enter it on the phone if it asks</string>
+    <string name="files_pin_hint">Enter the PIN on the phone if it asks.</string>
     <string name="files_saved_in">Saved in Downloads, in the folder AirPlay TV</string>
     <string name="files_no_network">Not connected to Wi-Fi or Ethernet</string>
     <string name="files_port_busy">Could not open the receiving port</string>
     <string name="files_received">Received</string>
     <string name="files_none">Nothing received yet</string>
     <string name="files_receiving">Receiving %1$s</string>
+    <string name="files_open">Open</string>
+    <string name="files_cannot_open">No app on this TV can open this file</string>
 </resources>

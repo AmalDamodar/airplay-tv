@@ -2,6 +2,7 @@ package io.github.jqssun.airplay.files
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
@@ -35,7 +36,7 @@ import java.util.concurrent.Executors
  * It only runs while the Files screen is open and only answers devices on the local network.
  */
 object FileReceiver {
-    data class Received(val name: String, val size: Long)
+    data class Received(val name: String, val size: Long, val uri: Uri? = null, val mime: String = "application/octet-stream")
     data class Progress(val name: String, val done: Long, val total: Long)
     data class State(
         val running: Boolean = false,
@@ -212,7 +213,7 @@ object FileReceiver {
             if (ok) sink.finish() else sink.discard()
         }
         if (ok) {
-            state.update { it.copy(current = null, received = listOf(Received(sink.name, total)) + it.received) }
+            state.update { it.copy(current = null, received = listOf(Received(sink.name, total, sink.uri, sink.mime)) + it.received) }
             reply(out, 200, "application/json", "{\"ok\":true,\"name\":${json(sink.name)},\"size\":$total}")
         } else {
             state.update { it.copy(current = null) }
@@ -290,6 +291,8 @@ object FileReceiver {
         val stream: OutputStream,
         val finish: () -> Unit,
         val discard: () -> Unit,
+        val uri: Uri? = null,
+        val mime: String = "application/octet-stream",
     ) {
         companion object {
             fun open(ctx: Context, name: String): Sink? = try {
@@ -326,6 +329,8 @@ object FileReceiver {
                         resolver.update(uri, done, null, null)
                     },
                     discard = { runCatching { resolver.delete(uri, null, null) } },
+                    uri = uri,
+                    mime = mimeOf(name),
                 )
             }
 

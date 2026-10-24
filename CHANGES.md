@@ -46,4 +46,6 @@ code are unchanged.
 
 - New **Files** tab: receive files from a phone or computer in a browser (`files/FileReceiver.kt`, the page in
   `assets/receive.html`, the screen in `ui/FilesScreen.kt`). QR code made with ZXing core (Apache License 2.0). Files go
-  to Downloads/AirPlay TV through MediaStore. The server runs only while the tab is open and needs the PIN shown on the TV.
+  to Downloads/AirPlay TV through MediaStore. The server runs only while the tab is open and needs the PIN shown on the TV. The screen has the connection details
+  on the left and the received files on the right; each received file can be opened with an app on the TV (adds the
+  `REQUEST_INSTALL_PACKAGES` permission so an APK can go to the system installer).
