@@ -137,23 +137,32 @@ On the iPhone: **Control Center, Screen Mirroring, pick your TV's name.** Both d
 
 ## Send files to the TV
 
-Open the **Files** tab in the app. The TV shows a QR code, an address (like `http://192.168.1.50:8765`) and a 4-digit PIN.
+Open the **Receive** tab in the app. The TV shows a QR code, an address (like `http://192.168.1.50:8765`) and a 4-digit PIN.
 On the iPhone, iPad or Mac, scan the code with the camera (or type the address in a browser on the same Wi-Fi), choose
 the files and wait until each one says Done. They are saved on the TV in **Downloads, in the folder AirPlay TV**.
-On the TV, the right side of the Files tab lists what arrived. Each file has three buttons: **Open** (with an app on
-the TV: a video in a video player, an APK in the system installer), **Show in folder** (a file manager app) and
+On the TV, the right side of the Receive tab lists what arrived. Each file has three buttons: **Open** (with an app on
+the TV: a video in a video player, an APK in the system installer), **Show in folder** (jumps to the Files tab at that folder) and
 **Delete**. Delete asks whether to delete the file from the TV or only remove it from the list.
 
 - Nothing to install on the phone or computer: it is a web page served by the TV.
 - Big files are fine: they are written straight to storage while they arrive (a 600 MB video was sent and compared
   byte for byte). Speed is limited by your Wi-Fi; about 7.5 MB/s on the test TV, so a 2 GB movie takes about 5 minutes.
 - Only devices on your own network can connect, and every upload needs the PIN. Five wrong PINs lock that device out for
-  a minute. The receiver runs only while the Files tab is open; leave the tab and the port closes.
-- **Show in folder** needs a file manager app on the TV that can open a folder. The Xiaomi TV used for testing has
-  none (its built-in media explorer cannot open a given folder), so there the button only says where the file is.
+  a minute. The receiver runs only while the Receive tab is open (it also closes after 30 minutes without use).
 - **Open** hands the file to whatever app on the TV can show it. If none can, you get a message. A TV usually has no
   gallery or document viewer, so photos and text files may need an app installed first. For an APK, Android asks once
   to allow installs from this app.
+
+## Browse the TV's files
+
+The **Files** tab is a small file manager made for the remote: internal storage and USB drives, folders first, in the
+same glass style. **OK** opens a folder or a file (a video in a video player, an APK in the system installer),
+**Back** goes up one level, and the trash button to the right of a row deletes after asking (the question starts on
+Cancel). The standard top-level folders (Download, DCIM, Android and so on) cannot be deleted from here. The first time,
+choose **Allow access**.
+
+On Android 10 TVs this works through the "legacy storage" setting. On Android 11 or newer the app needs the "all files
+access" permission from the system settings, which some TVs do not offer; then the tab says so.
 
 ## What works, what does not
 

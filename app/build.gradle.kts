@@ -38,7 +38,7 @@ android {
         applicationId = "com.minimaltv.airplay"
         minSdk = 24
         targetSdk = 36
-        versionCode = 311
+        versionCode = 313
         versionName = "2.1.0"
 
         if (!prebuiltNative) {

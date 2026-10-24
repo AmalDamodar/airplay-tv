@@ -63,3 +63,12 @@ code are unchanged.
 - The accept loop no longer ends when a client resets a connection before it is accepted.
 - The receiver stays up while the Files tab is selected even if Android rebuilds the screen, and closes after 30 minutes
   without use.
+
+### Files tab (file manager) and Receive tab
+
+- The receiving screen is now the **Receive** tab. A new **Files** tab (`ui/StorageScreen.kt`) browses internal storage
+  and USB drives with the remote: OK opens, Back goes up, trash deletes after asking. "Show in folder" on the Receive
+  tab opens it at Download/AirPlay TV.
+- Manifest: `READ/WRITE_EXTERNAL_STORAGE`, `MANAGE_EXTERNAL_STORAGE` (for Android 11+) and
+  `requestLegacyExternalStorage` (honoured on Android 10). The file provider now covers any path, only to hand a file you
+  opened to another app. Deleting also tells the media database, so no stale entries are left.

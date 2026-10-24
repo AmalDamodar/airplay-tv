@@ -1,12 +1,9 @@
 package io.github.jqssun.airplay.ui
 
-import android.app.DownloadManager
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
-import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -69,7 +66,7 @@ private val RowShape = RoundedCornerShape(16.dp)
  * the network the rest of the time. Left: how to connect. Right: what has arrived, each file can be opened.
  */
 @Composable
-fun FilesScreen() {
+fun FilesScreen(onShowFolder: () -> Unit = {}) {
     val ctx = LocalContext.current
     val view = LocalView.current
     val st by FileReceiver.state.collectAsState()
@@ -100,12 +97,12 @@ fun FilesScreen() {
             if (wide) {
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ConnectPanel(st, Modifier.width(330.dp).fillMaxHeight())
-                    ReceivedPanel(st, Modifier.weight(1f).fillMaxHeight())
+                    ReceivedPanel(st, Modifier.weight(1f).fillMaxHeight(), onShowFolder)
                 }
             } else {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     ConnectPanel(st, Modifier.fillMaxWidth())
-                    ReceivedPanel(st, Modifier.fillMaxWidth().height(360.dp))
+                    ReceivedPanel(st, Modifier.fillMaxWidth().height(360.dp), onShowFolder)
                 }
             }
         }
@@ -152,7 +149,7 @@ private fun ConnectPanel(st: FileReceiver.State, modifier: Modifier) {
 
 /** The file arriving now (with progress) on top, then everything received, newest first. */
 @Composable
-private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
+private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier, onShowFolder: () -> Unit) {
     val g = LocalGlass.current
     val ctx = LocalContext.current
     val cur = st.current
@@ -194,7 +191,7 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
                             Text(sizeText(r.size), style = MaterialTheme.typography.bodySmall, color = g.textDim)
                         }
                         RowAction(stringResource(R.string.files_open), Icons.AutoMirrored.Filled.OpenInNew, showLabel = true) { openReceived(ctx, r) }
-                        RowAction(stringResource(R.string.files_open_folder), Icons.Default.FolderOpen) { openFolder(ctx) }
+                        RowAction(stringResource(R.string.files_open_folder), Icons.Default.FolderOpen) { onShowFolder() }
                         RowAction(stringResource(R.string.files_delete), Icons.Default.DeleteOutline) { toDelete = r }
                     }
                 }
@@ -217,7 +214,7 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
 
 /** One selectable action at the end of a row: a round icon button, or a pill with a label. */
 @Composable
-private fun RowAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, showLabel: Boolean = false, onClick: () -> Unit) {
+internal fun RowAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, showLabel: Boolean = false, onClick: () -> Unit) {
     val g = LocalGlass.current
     Row(
         Modifier
@@ -256,38 +253,16 @@ private fun DeleteDialog(name: String, onDeleteFile: () -> Unit, onRemoveFromLis
     LaunchedEffect(Unit) { keep.requestFocusUntilLanded() }
 }
 
-/** Shows the folder in a file manager app, if the TV has one that can open a folder. */
-private fun openFolder(ctx: Context) {
-    val candidates = ArrayList<Intent>()
-    if (Build.VERSION.SDK_INT >= 29) {
-        val folder = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/AirPlay TV")
-        candidates += Intent(Intent.ACTION_VIEW).setDataAndType(folder, DocumentsContract.Document.MIME_TYPE_DIR)
-    }
-    candidates += Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-    for (i in candidates) {
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val real = ctx.packageManager.queryIntentActivities(i, PackageManager.MATCH_DEFAULT_ONLY)
-            .any { it.activityInfo.packageName != STUB_PACKAGE }
-        if (real) {
-            try {
-                ctx.startActivity(i)
-                // not every file manager can jump into a folder, so say where to look
-                Toast.makeText(ctx, R.string.files_folder_hint, Toast.LENGTH_LONG).show()
-                return
-            } catch (_: Exception) {}
-        }
-    }
-    Toast.makeText(ctx, R.string.files_no_file_manager, Toast.LENGTH_LONG).show()
-}
-
 // the TV's built-in stub only says "no app"; it never counts as a handler
-private const val STUB_PACKAGE = "com.google.android.tv.frameworkpackagestubs"
+internal const val STUB_PACKAGE = "com.google.android.tv.frameworkpackagestubs"
 
 /** Opens a received file with whatever app on the TV can show it (an APK goes to the system installer). */
-private fun openReceived(ctx: Context, r: FileReceiver.Received) {
-    val uri = r.uri
+private fun openReceived(ctx: Context, r: FileReceiver.Received) = openContent(ctx, r.uri, r.mime, r.name)
+
+/** Hands a file to an app that can show it; says so if there is none. */
+internal fun openContent(ctx: Context, uri: android.net.Uri?, mime: String, name: String) {
     val view = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, r.mime)
+        setDataAndType(uri, mime)
         clipData = uri?.let { ClipData.newRawUri("", it) }
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }
@@ -299,13 +274,13 @@ private fun openReceived(ctx: Context, r: FileReceiver.Received) {
     }
     try {
         if (handlers.size == 1) ctx.startActivity(view)
-        else ctx.startActivity(Intent.createChooser(view, r.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        else ctx.startActivity(Intent.createChooser(view, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: Exception) {
         Toast.makeText(ctx, R.string.files_cannot_open, Toast.LENGTH_LONG).show()
     }
 }
 
-private fun sizeText(bytes: Long): String {
+internal fun sizeText(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
     val units = arrayOf("KB", "MB", "GB", "TB")
     var v = bytes.toDouble()
