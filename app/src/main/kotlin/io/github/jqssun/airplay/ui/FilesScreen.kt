@@ -74,13 +74,12 @@ fun FilesScreen() {
     val view = LocalView.current
     val st by FileReceiver.state.collectAsState()
 
+    // Starting is safe to repeat. Stopping happens when the tab is left (MainScreen) or the app is closed, not when
+    // Android merely rebuilds the screen, so a transfer is not cut off by that.
     DisposableEffect(Unit) {
         FileReceiver.start(ctx)
         view.keepScreenOn = true
-        onDispose {
-            view.keepScreenOn = false
-            FileReceiver.stop()
-        }
+        onDispose { view.keepScreenOn = false }
     }
     LaunchedEffect(Unit) {
         while (true) { delay(5_000); FileReceiver.refreshAddress() }
@@ -144,7 +143,7 @@ private fun ConnectPanel(st: FileReceiver.State, modifier: Modifier) {
             )
         } else {
             Text(
-                stringResource(if (st.error != null) R.string.files_port_busy else R.string.files_no_network),
+                stringResource(when (st.error) { null -> R.string.files_no_network; "idle" -> R.string.files_idle; else -> R.string.files_port_busy }),
                 style = MaterialTheme.typography.titleMedium, color = g.textDim, textAlign = TextAlign.Center,
             )
         }
@@ -270,7 +269,12 @@ private fun openFolder(ctx: Context) {
         val real = ctx.packageManager.queryIntentActivities(i, PackageManager.MATCH_DEFAULT_ONLY)
             .any { it.activityInfo.packageName != STUB_PACKAGE }
         if (real) {
-            try { ctx.startActivity(i); return } catch (_: Exception) {}
+            try {
+                ctx.startActivity(i)
+                // not every file manager can jump into a folder, so say where to look
+                Toast.makeText(ctx, R.string.files_folder_hint, Toast.LENGTH_LONG).show()
+                return
+            } catch (_: Exception) {}
         }
     }
     Toast.makeText(ctx, R.string.files_no_file_manager, Toast.LENGTH_LONG).show()

@@ -141,30 +141,48 @@
     try { if (navigator.wakeLock && !wake) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); } catch (e) {}
     var job = queue.shift(), f = job.file, row = job.row;
     var state = row.querySelector('.meta span:last-child'), bar = row.querySelector('.bar i');
-    var x = new XMLHttpRequest(), t0 = Date.now();
+    var watchdog = null;
     function end(ok, msg) {
+      if (watchdog) { clearInterval(watchdog); watchdog = null; }
       row.classList.add(ok ? 'done' : 'fail');
       state.textContent = msg;
       if (ok) bar.style.width = '100%';
       busy = false; next();
     }
-    x.open('PUT', '/upload?name=' + encodeURIComponent(f.name));
-    x.setRequestHeader('X-Pin', pin);
-    x.upload.onprogress = function (e) {
-      if (!e.lengthComputable) return;
-      bar.style.width = (100 * e.loaded / e.total).toFixed(1) + '%';
-      var s = (Date.now() - t0) / 1000;
-      state.textContent = Math.floor(100 * e.loaded / e.total) + '%' + (s > 1 ? '  ·  ' + size(e.loaded / s) + '/s' : '');
+    function failStatus(status, fallback) {
+      if (status === 403) { end(false, 'Wrong PIN'); askPin('The PIN changed. Enter the one on the TV.'); }
+      else if (status === 429) end(false, 'Too many tries');
+      else if (status === 507) end(false, 'Not enough space on the TV');
+      else if (status === 0) end(false, fallback || 'Cannot reach the TV. Is the Files screen open on the TV?');
+      else end(false, 'Failed (' + status + ')');
+    }
+
+    state.textContent = 'Asking the TV…';
+    var p = new XMLHttpRequest();
+    p.open('POST', '/prepare?size=' + f.size);
+    p.setRequestHeader('X-Pin', pin);
+    p.onerror = function () { failStatus(0); };
+    p.onload = function () {
+      if (p.status !== 200) return failStatus(p.status);
+      var x = new XMLHttpRequest(), t0 = Date.now(), lastProgress = Date.now();
+      x.open('PUT', '/upload?name=' + encodeURIComponent(f.name));
+      x.setRequestHeader('X-Pin', pin);
+      state.textContent = 'Starting…';
+      watchdog = setInterval(function () {
+        if (Date.now() - lastProgress > 20000) state.textContent = 'No answer from the TV. Is the Files screen still open on the TV?';
+      }, 5000);
+      x.upload.onprogress = function (e) {
+        lastProgress = Date.now();
+        if (!e.lengthComputable) return;
+        bar.style.width = (100 * e.loaded / e.total).toFixed(1) + '%';
+        var s = (Date.now() - t0) / 1000;
+        state.textContent = Math.floor(100 * e.loaded / e.total) + '%' + (s > 1 ? '  ·  ' + size(e.loaded / s) + '/s' : '');
+      };
+      x.onload = function () { if (x.status === 200) end(true, 'Done'); else failStatus(x.status); };
+      x.onerror = function () { failStatus(0, 'Connection lost. Check the TV, then try this file again.'); };
+      x.send(f);
     };
-    x.onload = function () {
-      if (x.status === 200) end(true, 'Done');
-      else if (x.status === 403) { end(false, 'Wrong PIN'); askPin('The PIN changed. Enter the one on the TV.'); }
-      else if (x.status === 429) end(false, 'Too many tries');
-      else if (x.status === 507) end(false, 'Not enough space on the TV');
-      else end(false, 'Failed (' + x.status + ')');
-    };
-    x.onerror = function () { end(false, 'Connection lost'); };
-    x.send(f);
+    p.send();
   }
 })();
 </script>

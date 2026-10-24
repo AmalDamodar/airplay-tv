@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.BrightnessHigh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,7 +99,9 @@ fun MainScreen(
     onSurfaceDestroyed: (android.view.Surface) -> Unit,
     onPip: () -> Unit = {}
 ) {
-    var tab by remember { mutableStateOf(Tab.OVERVIEW) }
+    var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
+    // the file receiver listens only while its tab is open
+    LaunchedEffect(tab) { if (tab != Tab.FILES) io.github.jqssun.airplay.files.FileReceiver.stop() }
     var fullscreen by remember { mutableStateOf(false) }
     val pin by viewModel.pinCode.collectAsState()
     val connections by viewModel.connectionCount.collectAsState()

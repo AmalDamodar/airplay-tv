@@ -59,12 +59,15 @@ object FileReceiver {
     private const val FREE_SPACE_MARGIN = 200L * 1024 * 1024
     private const val MAX_FAILS = 5
     private const val LOCK_MS = 60_000L
+    private const val IDLE_STOP_MS = 30L * 60_000
+    private const val REL_PATH = "Download/AirPlay TV/"
 
     private var app: Context? = null
     private var server: ServerSocket? = null
     private var pool: ExecutorService? = null
     private var pin = ""
     private val fails = ConcurrentHashMap<String, Pair<Int, Long>>()
+    @Volatile private var lastActivity = 0L
 
     @Synchronized
     fun start(context: Context) {
@@ -92,12 +95,30 @@ object FileReceiver {
         val executor = Executors.newCachedThreadPool()
         pool = executor
         state.update { it.copy(running = true, address = localAddress(), port = bound.localPort, pin = pin, current = null, error = null) }
+        lastActivity = System.currentTimeMillis()
         Thread({
             while (!bound.isClosed) {
-                val client = try { bound.accept() } catch (_: Exception) { break }
+                val client = try {
+                    bound.accept()
+                } catch (_: Exception) {
+                    // a client that resets before we accept it must not end the loop
+                    if (bound.isClosed) break
+                    try { Thread.sleep(50) } catch (_: InterruptedException) { break }
+                    continue
+                }
+                lastActivity = System.currentTimeMillis()
                 try { executor.execute { handle(client) } } catch (_: Exception) { runCatching { client.close() } }
             }
         }, "file-receiver").start()
+        // close the port when nothing has happened for a while, so it is not left open by accident
+        Thread({
+            while (!bound.isClosed) {
+                try { Thread.sleep(60_000) } catch (_: InterruptedException) { break }
+                val idle = System.currentTimeMillis() - lastActivity
+                if (state.value.current == null && idle > IDLE_STOP_MS) { stop(); state.update { it.copy(error = "idle") }; break }
+            }
+        }, "file-receiver-idle").start()
+        cleanStalePending(ctx)
     }
 
     @Synchronized
@@ -107,6 +128,18 @@ object FileReceiver {
         runCatching { pool?.shutdownNow() }
         pool = null
         state.update { it.copy(running = false, current = null) }
+    }
+
+    /** A transfer that died half way (power cut, killed app) leaves a pending entry that blocks the same name later. */
+    private fun cleanStalePending(ctx: Context) {
+        if (Build.VERSION.SDK_INT < 29) return
+        Thread({
+            try {
+                val resolver = ctx.contentResolver
+                for (row in Sink.rows(resolver, null)) if (row.pending || row.missing) resolver.delete(row.uri, null, null)
+            } catch (_: Exception) {
+            }
+        }, "file-receiver-clean").start()
     }
 
     /** Takes a file off the list; the file itself stays on the TV. */
@@ -152,6 +185,7 @@ object FileReceiver {
                 when {
                     method == "GET" && path == "/" -> page(out)
                     method == "POST" && path == "/check" -> if (authorized(peer, headers, out)) reply(out, 200, "application/json", "{\"ok\":true}")
+                    method == "POST" && path == "/prepare" -> if (authorized(peer, headers, out)) prepare(out, query["size"])
                     method == "PUT" && path == "/upload" -> if (authorized(peer, headers, out)) upload(input, out, headers, query["name"])
                     else -> reply(out, 404, "text/plain", "Not found")
                 }
@@ -190,13 +224,24 @@ object FileReceiver {
         return false
     }
 
+    /** Answered before the browser sends a file, so a refusal (no space) shows up at once instead of after the whole upload. */
+    private fun prepare(out: OutputStream, size: String?) {
+        val total = size?.toLongOrNull() ?: 0L
+        val free = freeSpace()
+        if (total + FREE_SPACE_MARGIN > free) return reply(out, 507, "application/json", "{\"error\":\"space\",\"free\":$free}")
+        reply(out, 200, "application/json", "{\"ok\":true,\"free\":$free}")
+    }
+
+    private fun freeSpace(): Long =
+        runCatching { StatFs(Environment.getExternalStorageDirectory().path).availableBytes }.getOrDefault(Long.MAX_VALUE)
+
     private fun upload(input: BufferedInputStream, out: OutputStream, headers: Map<String, String>, rawName: String?) {
         val ctx = app ?: return reply(out, 500, "text/plain", "Not ready")
         val total = headers["content-length"]?.toLongOrNull()
         if (total == null) return reply(out, 411, "application/json", "{\"error\":\"length\"}")
         if (total <= 0) return reply(out, 400, "application/json", "{\"error\":\"empty\"}")
         val name = sanitize(rawName)
-        val free = runCatching { StatFs(Environment.getExternalStorageDirectory().path).availableBytes }.getOrDefault(Long.MAX_VALUE)
+        val free = freeSpace()
         if (total + FREE_SPACE_MARGIN > free) return reply(out, 507, "application/json", "{\"error\":\"space\"}")
 
         val sink = Sink.open(ctx, name) ?: return reply(out, 500, "application/json", "{\"error\":\"write\"}")
@@ -306,10 +351,66 @@ object FileReceiver {
         val mime: String = "application/octet-stream",
     ) {
         companion object {
-            fun open(ctx: Context, name: String): Sink? = try {
-                if (Build.VERSION.SDK_INT >= 29) openMediaStore(ctx, name) else openFile(ctx, name)
-            } catch (_: Exception) {
-                null
+            class Row(val uri: Uri, val pending: Boolean, val missing: Boolean)
+
+            /** Entries in our folder (pending ones included), optionally only those with this display name. */
+            fun rows(resolver: android.content.ContentResolver, name: String?): List<Row> {
+                if (Build.VERSION.SDK_INT < 29) return emptyList()
+                val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val selection = if (name == null) "${MediaStore.Downloads.RELATIVE_PATH}=?" else "${MediaStore.Downloads.RELATIVE_PATH}=? AND ${MediaStore.Downloads.DISPLAY_NAME}=?"
+                val args = if (name == null) arrayOf(REL_PATH) else arrayOf(REL_PATH, name)
+                @Suppress("DEPRECATION")
+                val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.IS_PENDING, MediaStore.Downloads.DATA)
+                val cursor = if (Build.VERSION.SDK_INT >= 30) {
+                    val q = android.os.Bundle().apply {
+                        putString(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                        putStringArray(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, args)
+                        putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
+                    }
+                    resolver.query(collection, projection, q, null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    resolver.query(MediaStore.setIncludePending(collection), projection, selection, args, null)
+                }
+                val out = ArrayList<Row>()
+                cursor?.use {
+                    while (it.moveToNext()) {
+                        val path = it.getString(2)
+                        out += Row(
+                            android.content.ContentUris.withAppendedId(collection, it.getLong(0)),
+                            it.getInt(1) == 1,
+                            missing = path != null && !File(path).exists(),
+                        )
+                    }
+                }
+                return out
+            }
+
+            /** The first name nobody is using: stale half-finished entries are cleared, finished files are never replaced. */
+            private fun freeName(resolver: android.content.ContentResolver, name: String): String {
+                val base = name.substringBeforeLast('.', name)
+                val ext = name.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
+                var candidate = name
+                var n = 1
+                while (n < 1000) {
+                    var taken = false
+                    for (row in rows(resolver, candidate)) {
+                        // half-finished entries and entries whose file has been removed are stale: clear them
+                        if (row.pending || row.missing) runCatching { resolver.delete(row.uri, null, null) } else taken = true
+                    }
+                    if (!taken) return candidate
+                    candidate = "$base ($n)$ext"
+                    n++
+                }
+                return candidate
+            }
+
+            fun open(ctx: Context, name: String): Sink? {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    try { openMediaStore(ctx, name)?.let { return it } } catch (_: Exception) {}
+                }
+                // last resort: the app's own folder (still readable by file managers on Android 10)
+                return try { openFile(ctx, name) } catch (_: Exception) { null }
             }
 
             private fun mimeOf(name: String): String {
@@ -322,10 +423,11 @@ object FileReceiver {
 
             private fun openMediaStore(ctx: Context, name: String): Sink? {
                 val resolver = ctx.contentResolver
+                val unique = freeName(resolver, name)
                 val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, name)
-                    put(MediaStore.Downloads.MIME_TYPE, mimeOf(name))
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AirPlay TV")
+                    put(MediaStore.Downloads.DISPLAY_NAME, unique)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeOf(unique))
+                    put(MediaStore.Downloads.RELATIVE_PATH, REL_PATH)
                     put(MediaStore.Downloads.IS_PENDING, 1)
                 }
                 val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
@@ -341,7 +443,7 @@ object FileReceiver {
                     },
                     discard = { runCatching { resolver.delete(uri, null, null) } },
                     uri = uri,
-                    mime = mimeOf(name),
+                    mime = mimeOf(unique),
                 )
             }
 

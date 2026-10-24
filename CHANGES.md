@@ -51,3 +51,15 @@ code are unchanged.
   `REQUEST_INSTALL_PACKAGES` permission so an APK can go to the system installer). Per-file buttons: Open, Show in
   folder (hands the Downloads/AirPlay TV folder to a file manager if the TV has one) and Delete (delete the file, or
   only remove it from the list).
+
+### Files tab fixes (still 2.1.0)
+
+- A transfer that died half way, or a file removed outside the app, left an entry in the media database that made the
+  next upload with the same name fail ("UNIQUE constraint failed: files._data") before any data was read. The receiver
+  now clears half-finished entries and entries whose file is gone, and never overwrites a finished file (it adds
+  " (1)" to the name).
+- The browser page asks the TV first (`/prepare`) so "not enough space" shows at once, and shows "No answer from the
+  TV" if nothing arrives for 20 seconds.
+- The accept loop no longer ends when a client resets a connection before it is accepted.
+- The receiver stays up while the Files tab is selected even if Android rebuilds the screen, and closes after 30 minutes
+  without use.

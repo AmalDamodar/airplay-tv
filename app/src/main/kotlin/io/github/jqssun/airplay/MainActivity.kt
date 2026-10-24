@@ -164,6 +164,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (isFinishing) io.github.jqssun.airplay.files.FileReceiver.stop()
         service?.let {
             if (it.logCallback === logCallback) it.logCallback = null
             if (it.pinCallback === pinCallback) it.pinCallback = null

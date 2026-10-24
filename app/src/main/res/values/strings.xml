@@ -219,12 +219,14 @@
     <string name="files_pin_hint">Enter the PIN on the phone if it asks.</string>
     <string name="files_saved_in">Saved in Downloads, in the folder AirPlay TV</string>
     <string name="files_no_network">Not connected to Wi-Fi or Ethernet</string>
+    <string name="files_idle">The receiver stopped after 30 minutes without use. Leave this tab and open Files again.</string>
     <string name="files_port_busy">Could not open the receiving port</string>
     <string name="files_received">Received</string>
     <string name="files_none">Nothing received yet</string>
     <string name="files_receiving">Receiving %1$s</string>
     <string name="files_open">Open</string>
     <string name="files_open_folder">Show in folder</string>
+    <string name="files_folder_hint">In the file manager open Download, then the folder AirPlay TV</string>
     <string name="files_delete">Delete</string>
     <string name="files_delete_title">Delete %1$s?</string>
     <string name="files_delete_text">Delete the file from the TV, or only take it off this list and keep the file.</string>
