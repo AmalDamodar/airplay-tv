@@ -87,7 +87,6 @@ import kotlinx.coroutines.delay
 private enum class Tab(val labelRes: Int, val icon: ImageVector) {
     OVERVIEW(R.string.tab_overview, Icons.Default.Cast),
     FILES(R.string.tab_files, Icons.Default.UploadFile),
-    STORAGE(R.string.tab_storage, Icons.Default.Folder),
     LOGS(R.string.tab_logs, Icons.AutoMirrored.Filled.Article),
     SETTINGS(R.string.tab_settings, Icons.Default.Settings)
 }
@@ -101,8 +100,6 @@ fun MainScreen(
     onPip: () -> Unit = {}
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
-    // set by "Show in folder" on the Receive tab: the Files tab opens there
-    var browseTarget by remember { mutableStateOf<java.io.File?>(null) }
     // the file receiver listens only while its tab is open
     LaunchedEffect(tab) { if (tab != Tab.FILES) io.github.jqssun.airplay.files.FileReceiver.stop() }
     var fullscreen by remember { mutableStateOf(false) }
@@ -607,12 +604,6 @@ fun MainScreen(
                         TabContent(
                             tab, viewModel, video,
                             onFullscreen = { fullscreen = true }, onPip = onPip, showAudioMode = audioOnly,
-                            browseTarget = browseTarget,
-                            onShowFolder = {
-                                browseTarget = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Download/AirPlay TV")
-                                tab = Tab.STORAGE
-                            },
-                            onBrowseConsumed = { browseTarget = null },
                         )
                     }
                     if (tv) {
@@ -657,17 +648,13 @@ private fun TabContent(
     onFullscreen: () -> Unit,
     onPip: () -> Unit,
     showAudioMode: Boolean,
-    browseTarget: java.io.File?,
-    onShowFolder: () -> Unit,
-    onBrowseConsumed: () -> Unit,
 ) {
     when (tab) {
         Tab.OVERVIEW -> OverviewContent(
             viewModel, video,
             onFullscreen = onFullscreen, onPip = onPip, showAudioMode = showAudioMode
         )
-        Tab.FILES -> FilesScreen(onShowFolder)
-        Tab.STORAGE -> StorageScreen(browseTarget, onBrowseConsumed)
+        Tab.FILES -> FilesScreen()
         Tab.LOGS -> LogsScreen(viewModel)
         Tab.SETTINGS -> SettingsScreen(viewModel)
     }

@@ -76,3 +76,12 @@ code are unchanged.
   folder, then choose Paste here (a bar at the top shows what is waiting, with progress for big files and Cancel).
   Names that already exist get " (1)". The standard top-level folders can only be copied. The list refreshes when the
   app comes back to the front.
+
+## 2.2.0
+
+- The file manager (the old Files tab, `ui/StorageScreen.kt`) moved out of this app into its own app, **Files**
+  (`com.minimaltv.files`, in the MinimalTV project). The rail now has Overview, Receive, Logs and Settings.
+- **Show in folder** on the Receive tab starts the Files app at Download/AirPlay TV (explicit intent with the extra
+  `com.minimaltv.files.PATH`), or shows a message when Files is not installed.
+- The app no longer asks for storage permissions (`READ/WRITE/MANAGE_EXTERNAL_STORAGE`, legacy storage). The FileProvider
+  only serves the exported log file. Received files are still written and deleted through MediaStore.

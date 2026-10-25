@@ -66,7 +66,7 @@ private val RowShape = RoundedCornerShape(16.dp)
  * the network the rest of the time. Left: how to connect. Right: what has arrived, each file can be opened.
  */
 @Composable
-fun FilesScreen(onShowFolder: () -> Unit = {}) {
+fun FilesScreen() {
     val ctx = LocalContext.current
     val view = LocalView.current
     val st by FileReceiver.state.collectAsState()
@@ -97,12 +97,12 @@ fun FilesScreen(onShowFolder: () -> Unit = {}) {
             if (wide) {
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ConnectPanel(st, Modifier.width(330.dp).fillMaxHeight())
-                    ReceivedPanel(st, Modifier.weight(1f).fillMaxHeight(), onShowFolder)
+                    ReceivedPanel(st, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     ConnectPanel(st, Modifier.fillMaxWidth())
-                    ReceivedPanel(st, Modifier.fillMaxWidth().height(360.dp), onShowFolder)
+                    ReceivedPanel(st, Modifier.fillMaxWidth().height(360.dp))
                 }
             }
         }
@@ -149,7 +149,7 @@ private fun ConnectPanel(st: FileReceiver.State, modifier: Modifier) {
 
 /** The file arriving now (with progress) on top, then everything received, newest first. */
 @Composable
-private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier, onShowFolder: () -> Unit) {
+private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
     val g = LocalGlass.current
     val ctx = LocalContext.current
     val cur = st.current
@@ -191,7 +191,7 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier, onShowFold
                             Text(sizeText(r.size), style = MaterialTheme.typography.bodySmall, color = g.textDim)
                         }
                         RowAction(stringResource(R.string.files_open), Icons.AutoMirrored.Filled.OpenInNew, showLabel = true) { openReceived(ctx, r) }
-                        RowAction(stringResource(R.string.files_open_folder), Icons.Default.FolderOpen) { onShowFolder() }
+                        RowAction(stringResource(R.string.files_open_folder), Icons.Default.FolderOpen) { showInFilesApp(ctx) }
                         RowAction(stringResource(R.string.files_delete), Icons.Default.DeleteOutline) { toDelete = r }
                     }
                 }
@@ -251,6 +251,21 @@ private fun DeleteDialog(name: String, onDeleteFile: () -> Unit, onRemoveFromLis
     )
     // start on Cancel so one stray OK press deletes nothing
     LaunchedEffect(Unit) { keep.requestFocusUntilLanded() }
+}
+
+private const val FILES_PACKAGE = "com.minimaltv.files"
+
+/** Opens the Files app (a separate app from the MinimalTV setup) at the folder the received files are saved in. */
+private fun showInFilesApp(ctx: Context) {
+    val folder = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Download/AirPlay TV")
+    val intent = Intent().setClassName(FILES_PACKAGE, "$FILES_PACKAGE.MainActivity")
+        .putExtra("$FILES_PACKAGE.PATH", folder.absolutePath)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        ctx.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(ctx, R.string.files_app_missing, Toast.LENGTH_LONG).show()
+    }
 }
 
 // the TV's built-in stub only says "no app"; it never counts as a handler

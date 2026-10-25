@@ -12,7 +12,6 @@ already built in.
 <img src="screenshots/receive.jpg" width="49%" alt="Receive: scan the code on the TV, send files from a phone or computer, see them arrive">
 </p>
 <p>
-<img src="screenshots/files.jpg" width="49%" alt="Files: a remote-friendly file manager with Copy, Move, Rename and Delete">
 <img src="screenshots/settings.jpg" width="49%" alt="Settings: the selected row gets a soft highlight">
 </p>
 
@@ -50,7 +49,7 @@ Details and what was ruled out: [docs/SETTINGS.md](docs/SETTINGS.md).
 
 | TV | Works? |
 | --- | --- |
-| Android TV or Google TV (Sony, TCL, Xiaomi, Philips, Hisense, Nvidia Shield, many others), Android 7 or newer | Should. Tested on **one** TV only: Xiaomi MiTV-MOOQ0, Android 10. Mirroring from an iPhone, including YouTube with sound, was tested on that TV with version 2.0.1; version 2.1.0 adds file receiving and browsing and leaves the mirroring engine unchanged. Receiving files was tested from an iPhone and a Mac browser, the Files tab with the remote |
+| Android TV or Google TV (Sony, TCL, Xiaomi, Philips, Hisense, Nvidia Shield, many others), Android 7 or newer | Should. Tested on **one** TV only: Xiaomi MiTV-MOOQ0, Android 10. Mirroring from an iPhone, including YouTube with sound, was tested on that TV with version 2.0.1; version 2.1.0 added file receiving and leaves the mirroring engine unchanged; 2.2.0 moves the file browser out into a separate Files app. Receiving files was tested from an iPhone and a Mac browser |
 | Fire TV | Probably, since it runs Android, but untested. Fire TV has its own adb switch under **Settings, My Fire TV, Developer options** |
 | Samsung (Tizen), LG (webOS), Roku | No. They are not Android TV and cannot run this app. Many newer models already have AirPlay built in, check your TV's settings |
 
@@ -145,7 +144,7 @@ Open the **Receive** tab in the app. The TV shows a QR code, an address (like `h
 On the iPhone, iPad or Mac, scan the code with the camera (or type the address in a browser on the same Wi-Fi), choose
 the files and wait until each one says Done. They are saved on the TV in **Downloads, in the folder AirPlay TV**.
 On the TV, the right side of the Receive tab lists what arrived. Each file has three buttons: **Open** (with an app on
-the TV: a video in a video player, an APK in the system installer), **Show in folder** (jumps to the Files tab at that folder) and
+the TV: a video in a video player, an APK in the system installer), **Show in folder** (opens the separate Files app at that folder, see below) and
 **Delete**. Delete asks whether to delete the file from the TV or only remove it from the list.
 
 - Nothing to install on the phone or computer: it is a web page served by the TV.
@@ -159,15 +158,10 @@ the TV: a video in a video player, an APK in the system installer), **Show in fo
 
 ## Browse the TV's files
 
-The **Files** tab is a small file manager made for the remote: internal storage and USB drives, folders first, in the
-same glass style. **OK** opens a folder or a file (a video in a video player, an APK in the system installer),
-**Back** goes up one level, and the **...** button to the right of a row offers **Copy**, **Move**, **Rename** and
-**Delete**. Copy and Move wait for a destination: open that folder, then choose **Paste here**. Delete asks first (the
-question starts on Cancel). The standard top-level folders (Download, DCIM, Android and so on) can only be copied. The first time,
-choose **Allow access**.
-
-On Android 10 TVs this works through the "legacy storage" setting. On Android 11 or newer the app needs the "all files
-access" permission from the system settings, which some TVs do not offer; then the tab says so.
+AirPlay TV does not browse files itself any more. The file manager is its own small app, **Files**, from the
+[MinimalTV project](https://github.com/AmalDamodar/minimaltv) (`files/` there). With it installed, **Show in folder**
+on the Receive tab opens Files at the folder the received files are in. Without it, that button says so and the rest of
+the app works as before. Receiving, opening and deleting received files need no storage permission.
 
 ## What works, what does not
 

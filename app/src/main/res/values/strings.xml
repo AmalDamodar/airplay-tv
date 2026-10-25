@@ -13,7 +13,6 @@
     <!-- Tabs -->
     <string name="tab_overview">Overview</string>
     <string name="tab_files">Receive</string>
-    <string name="tab_storage">Files</string>
     <string name="tab_logs">Logs</string>
     <string name="tab_settings">Settings</string>
 
@@ -234,37 +233,7 @@
     <string name="files_delete_list">Remove from list</string>
     <string name="files_deleted">File deleted</string>
     <string name="files_delete_failed">Could not delete the file</string>
+    <string name="files_app_missing">Install the Files app from the MinimalTV setup to browse this folder</string>
     <string name="files_cannot_open">No app on this TV can open this file</string>
 
-    <!-- Files (file manager) -->
-    <string name="storage_title">Files</string>
-    <string name="storage_internal">Internal storage</string>
-    <string name="storage_volumes">Storage</string>
-    <string name="storage_usb">USB drive</string>
-    <string name="storage_folder">Folder</string>
-    <string name="storage_empty">This folder is empty</string>
-    <string name="storage_up">Up</string>
-    <string name="storage_need_access">Allow access to the TV\'s storage to browse your files</string>
-    <string name="storage_allow">Allow access</string>
-    <string name="storage_no_settings">This TV has no settings screen for file access</string>
-    <string name="storage_delete_title">Delete %1$s?</string>
-    <string name="storage_delete_file">This file will be deleted from the TV.</string>
-    <string name="storage_delete_folder">This folder and everything in it will be deleted from the TV.</string>
-    <string name="storage_delete_failed">Could not delete</string>
-    <string name="storage_deleted">Deleted</string>
-    <string name="storage_more">More</string>
-    <string name="storage_copy">Copy</string>
-    <string name="storage_move">Move</string>
-    <string name="storage_rename">Rename</string>
-    <string name="storage_paste">Paste here</string>
-    <string name="storage_copy_what">Copy %1$s</string>
-    <string name="storage_move_what">Move %1$s</string>
-    <string name="storage_copying">Copying %1$s</string>
-    <string name="storage_moving">Moving %1$s</string>
-    <string name="storage_paste_hint">Open the destination folder, then choose Paste here</string>
-    <string name="storage_into_itself">A folder cannot be pasted into itself</string>
-    <string name="storage_same_folder">It is already in this folder</string>
-    <string name="storage_cancelled">Cancelled</string>
-    <string name="storage_op_failed">That did not work</string>
-    <string name="storage_unreadable">Cannot read this folder</string>
 </resources>
