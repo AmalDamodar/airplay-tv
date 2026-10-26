@@ -42,7 +42,7 @@
         android:banner="@drawable/banner"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AirPlayServer">
+        android:theme="@style/Theme.AirTVPlay">
 
         <activity
             android:name=".MainActivity"

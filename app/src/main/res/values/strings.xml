@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AirPlay TV</string>
+    <string name="app_name">AirTV Play</string>
 
     <!-- Notification -->
     <string name="notification_channel">AirPlay Service</string>
@@ -213,11 +213,13 @@
 
     <!-- Receive files -->
     <string name="files_title">Receive files</string>
+    <string name="files_card_title">Send files to this TV</string>
+    <string name="tab_home">Home</string>
     <string name="files_intro">Send movies, videos, photos and APK files from an iPhone, iPad or Mac</string>
     <string name="files_scan">Scan with the camera, or open this address in a browser on the same Wi-Fi</string>
     <string name="files_pin">PIN</string>
     <string name="files_pin_hint">Enter the PIN on the phone if it asks.</string>
-    <string name="files_saved_in">Saved in Downloads, in the folder AirPlay TV</string>
+    <string name="files_saved_in">Saved in Downloads, in the folder AirTV Play</string>
     <string name="files_no_network">Not connected to Wi-Fi or Ethernet</string>
     <string name="files_idle">The receiver stopped after 30 minutes without use. Leave this tab and open Files again.</string>
     <string name="files_port_busy">Could not open the receiving port</string>

@@ -85,9 +85,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.delay
 
 private enum class Tab(val labelRes: Int, val icon: ImageVector) {
-    OVERVIEW(R.string.tab_overview, Icons.Default.Cast),
-    FILES(R.string.tab_files, Icons.Default.UploadFile),
-    LOGS(R.string.tab_logs, Icons.AutoMirrored.Filled.Article),
+    HOME(R.string.tab_home, Icons.Default.Home),
     SETTINGS(R.string.tab_settings, Icons.Default.Settings)
 }
 
@@ -99,9 +97,9 @@ fun MainScreen(
     onSurfaceDestroyed: (android.view.Surface) -> Unit,
     onPip: () -> Unit = {}
 ) {
-    var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
-    // the file receiver listens only while its tab is open
-    LaunchedEffect(tab) { if (tab != Tab.FILES) io.github.jqssun.airplay.files.FileReceiver.stop() }
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    // the file receiver listens only while Home is open
+    LaunchedEffect(tab) { if (tab != Tab.HOME) io.github.jqssun.airplay.files.FileReceiver.stop() }
     var fullscreen by remember { mutableStateOf(false) }
     val pin by viewModel.pinCode.collectAsState()
     val connections by viewModel.connectionCount.collectAsState()
@@ -540,8 +538,8 @@ fun MainScreen(
                     Column {
                         AudioMiniController(
                             viewModel,
-                            visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
-                            onClick = { tab = Tab.OVERVIEW }
+                            visible = audioOnly && connections > 0 && tab != Tab.HOME,
+                            onClick = { tab = Tab.HOME }
                         )
                         NavigationBar(
                             containerColor = Color.Transparent,
@@ -570,33 +568,26 @@ fun MainScreen(
         ) { padding ->
             Row(
                 Modifier.fillMaxSize().padding(padding)
-                    .padding(horizontal = if (tv) 48.dp else 0.dp, vertical = if (tv) 27.dp else 0.dp),
-                horizontalArrangement = Arrangement.spacedBy(if (tv) 24.dp else 0.dp),
+                    .padding(horizontal = if (tv) 32.dp else 0.dp, vertical = if (tv) 20.dp else 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (tv) 16.dp else 0.dp),
             ) {
                 if (tv) {
                     NavigationRail(
-                        modifier = Modifier.fillMaxHeight().width(112.dp).glass(),
+                        modifier = Modifier.fillMaxHeight().width(72.dp).glass(RoundedCornerShape(24.dp)),
                         containerColor = Color.Transparent,
                         windowInsets = WindowInsets(0, 0, 0, 0),
-                        header = {
-                            Icon(
-                                Icons.Default.Cast, stringResource(R.string.app_name),
-                                Modifier.padding(vertical = 20.dp).size(32.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
                     ) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.weight(1f))
                         Tab.entries.forEach { t ->
                             NavigationRailItem(
                                 selected = tab == t,
                                 onClick = { tab = t },
-                                icon = { Icon(t.icon, null) },
-                                label = { Text(stringResource(t.labelRes)) },
+                                icon = { Icon(t.icon, stringResource(t.labelRes)) },
                                 colors = glassNavColors(),
                                 modifier = Modifier.padding(vertical = 6.dp),
                             )
                         }
+                        Spacer(Modifier.weight(1f))
                     }
                 }
                 Column(Modifier.weight(1f)) {
@@ -609,8 +600,8 @@ fun MainScreen(
                     if (tv) {
                         AudioMiniController(
                             viewModel,
-                            visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
-                            onClick = { tab = Tab.OVERVIEW }
+                            visible = audioOnly && connections > 0 && tab != Tab.HOME,
+                            onClick = { tab = Tab.HOME }
                         )
                     }
                 }
@@ -650,18 +641,25 @@ private fun TabContent(
     showAudioMode: Boolean,
 ) {
     when (tab) {
-        Tab.OVERVIEW -> OverviewContent(
+        Tab.HOME -> HomeContent(
             viewModel, video,
             onFullscreen = onFullscreen, onPip = onPip, showAudioMode = showAudioMode
         )
-        Tab.FILES -> FilesScreen()
-        Tab.LOGS -> LogsScreen(viewModel)
-        Tab.SETTINGS -> SettingsScreen(viewModel)
+        Tab.SETTINGS -> {
+            // the logs live inside Settings: one row opens them, Back returns
+            var logsOpen by remember { mutableStateOf(false) }
+            if (logsOpen) {
+                BackHandler { logsOpen = false }
+                LogsScreen(viewModel)
+            } else {
+                SettingsScreen(viewModel, onOpenLogs = { logsOpen = true })
+            }
+        }
     }
 }
 
 @Composable
-private fun OverviewContent(
+private fun HomeContent(
     viewModel: MainViewModel,
     video: @Composable () -> Unit,
     onFullscreen: () -> Unit,
@@ -671,137 +669,150 @@ private fun OverviewContent(
     val state by viewModel.serverState.collectAsState()
     val connections by viewModel.connectionCount.collectAsState()
     val serverName by viewModel.serverName.collectAsState()
-    val videoResolution by viewModel.videoResolution.collectAsState()
-    val idlePreview by viewModel.idlePreview.collectAsState()
     val mirroringActive by viewModel.mirroringActive.collectAsState()
     val videoPlaybackActive by viewModel.videoPlaybackActive.collectAsState()
-    val debugEnabled by viewModel.debugEnabled.collectAsState()
-    val debugInfo by viewModel.debugInfo.collectAsState()
     val tv = isTv()
-    val startFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        if (tv) startFocus.requestFocus()
-    }
+    val live = state == ServerState.RUNNING && connections > 0
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // content area
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(if (tv) 0.dp else 16.dp)
-                .glass(),
-            contentAlignment = Alignment.Center
+    Column(
+        Modifier.fillMaxSize().padding(if (tv) 0.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // what the receiver is doing and how to reach it, in one compact card on top
+        Row(
+            Modifier.fillMaxWidth().glass().padding(horizontal = 18.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            val connecting = state == ServerState.RUNNING && connections > 0 &&
-                !mirroringActive && !videoPlaybackActive
-            if (showAudioMode && state == ServerState.RUNNING && connections > 0) {
-                NowPlayingContent(viewModel)
-            } else {
-                if (state == ServerState.RUNNING && (mirroringActive || idlePreview)) {
-                    video()
-                }
-                if (state != ServerState.RUNNING || connections == 0) {
-                    ReceiverHero(name = serverName, state = state)
-                } else if (connecting) {
-                    Text(
-                        text = stringResource(R.string.waiting_for_playback),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-                if (state == ServerState.RUNNING && mirroringActive) {
-                    Row(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
-                            .background(Color.Black.copy(alpha = 0.65f), CircleShape).padding(4.dp)
-                    ) {
-                        IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
-                            Icon(
-                                painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(onClick = onFullscreen, modifier = Modifier.dpadFocus()) {
-                            Icon(
-                                Icons.Default.Fullscreen, contentDescription = stringResource(R.string.cd_fullscreen),
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-            if (debugEnabled && connections > 0) {
-                DebugOverlay(debugInfo, Modifier.align(Alignment.TopStart).padding(8.dp))
-            }
-            var showRes by remember { mutableStateOf(false) }
-            LaunchedEffect(videoResolution) {
-                if (videoResolution.isNotEmpty() && !showAudioMode) {
-                    showRes = true
-                    delay(5000)
-                    showRes = false
-                }
-            }
-            if (!showAudioMode) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showRes && connections > 0,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
-                ) {
-                    Text(
-                        text = videoResolution,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
-
-        // Keep the server action outside the scrolling content and its initial TV focus.
-        Box(
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = if (tv) 0.dp else 16.dp, vertical = 12.dp)
-                .glass(),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = serverName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                    ReceiverStatus(
-                        state, connections,
-                        connecting = !mirroringActive && !videoPlaybackActive,
-                    )
+                    ReceiverStatus(state, connections, connecting = !mirroringActive && !videoPlaybackActive)
                 }
-                Button(
-                    onClick = {
-                        if (state == ServerState.RUNNING) viewModel.stopServer()
-                        else viewModel.startServer()
+                Text(
+                    text = when (state) {
+                        ServerState.RUNNING -> stringResource(R.string.receiver_cast_help, serverName)
+                        ServerState.STOPPED -> stringResource(R.string.server_stopped)
+                        ServerState.ERROR -> stringResource(R.string.error_starting_server)
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.secondaryContainer
-                            else MaterialTheme.colorScheme.primary,
-                        contentColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.onSecondaryContainer
-                            else MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
-                    modifier = Modifier.heightIn(min = 52.dp).dpadFocus(CircleShape, focusScale = 1.06f).focusRequester(startFocus)
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Button(
+                onClick = {
+                    if (state == ServerState.RUNNING) viewModel.stopServer()
+                    else viewModel.startServer()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.primary,
+                    contentColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.onSecondaryContainer
+                        else MaterialTheme.colorScheme.onPrimary,
+                ),
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                modifier = Modifier.heightIn(min = 44.dp).dpadFocus(CircleShape),
+            ) {
+                Icon(
+                    imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(if (state == ServerState.RUNNING) stringResource(R.string.btn_stop) else stringResource(R.string.btn_start))
+            }
+        }
+
+        if (live) {
+            LiveArea(viewModel, video, onFullscreen, onPip, showAudioMode, Modifier.weight(1f).fillMaxWidth())
+        } else {
+            ReceiveSection(Modifier.weight(1f).fillMaxWidth())
+        }
+    }
+}
+
+/** While a phone is connected: the mirrored picture (or the audio player), with picture-in-picture and fullscreen. */
+@Composable
+private fun LiveArea(
+    viewModel: MainViewModel,
+    video: @Composable () -> Unit,
+    onFullscreen: () -> Unit,
+    onPip: () -> Unit,
+    showAudioMode: Boolean,
+    modifier: Modifier,
+) {
+    val state by viewModel.serverState.collectAsState()
+    val connections by viewModel.connectionCount.collectAsState()
+    val videoResolution by viewModel.videoResolution.collectAsState()
+    val mirroringActive by viewModel.mirroringActive.collectAsState()
+    val videoPlaybackActive by viewModel.videoPlaybackActive.collectAsState()
+    val debugEnabled by viewModel.debugEnabled.collectAsState()
+    val debugInfo by viewModel.debugInfo.collectAsState()
+    Box(modifier.glass(), contentAlignment = Alignment.Center) {
+        val connecting = state == ServerState.RUNNING && connections > 0 &&
+            !mirroringActive && !videoPlaybackActive
+        if (showAudioMode) {
+            NowPlayingContent(viewModel)
+        } else {
+            if (mirroringActive) video()
+            if (connecting) {
+                Text(
+                    text = stringResource(R.string.waiting_for_playback),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            if (mirroringActive) {
+                Row(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), CircleShape).padding(4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (state == ServerState.RUNNING) stringResource(R.string.btn_stop) else stringResource(R.string.btn_start))
+                    IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
+                        Icon(
+                            painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(onClick = onFullscreen, modifier = Modifier.dpadFocus()) {
+                        Icon(
+                            Icons.Default.Fullscreen, contentDescription = stringResource(R.string.cd_fullscreen),
+                            tint = Color.White
+                        )
+                    }
                 }
+            }
+        }
+        if (debugEnabled) {
+            DebugOverlay(debugInfo, Modifier.align(Alignment.TopStart).padding(8.dp))
+        }
+        var showRes by remember { mutableStateOf(false) }
+        LaunchedEffect(videoResolution) {
+            if (videoResolution.isNotEmpty() && !showAudioMode) {
+                showRes = true
+                delay(5000)
+                showRes = false
+            }
+        }
+        if (!showAudioMode) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showRes,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
+            ) {
+                Text(
+                    text = videoResolution,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
             }
         }
     }

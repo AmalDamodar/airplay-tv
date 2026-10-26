@@ -1,4 +1,4 @@
-# AirPlay TV
+# AirTV Play
 
 Show your iPhone, iPad or Mac screen on an Android TV, with sound, using AirPlay. No Apple TV needed. It can also
 receive files (movies, videos, photos, APK files) sent from a phone or computer, with nothing to install on the phone.
@@ -8,10 +8,7 @@ the installer scripts that put it on your TV, and a beginner guide. Mirroring se
 already built in.
 
 <p>
-<img src="screenshots/overview.jpg" width="49%" alt="Overview: the status dot glows green when the receiver is ready">
-<img src="screenshots/receive.jpg" width="49%" alt="Receive: scan the code on the TV, send files from a phone or computer, see them arrive">
-</p>
-<p>
+<img src="screenshots/home.jpg" width="49%" alt="Home: the receiver status, the QR code to send files, and the list of what arrived">
 <img src="screenshots/settings.jpg" width="49%" alt="Settings: the selected row gets a soft highlight">
 </p>
 
@@ -86,8 +83,8 @@ Replace `YOUR_TV_IP` with the address you wrote down.
 3. **Close PowerShell.** Press the Windows key, type `Git Bash`, press Enter. The scripts run in **Git Bash**, not in
    PowerShell. Paste these lines (right-click to paste), press Enter:
    ```sh
-   git clone https://github.com/AmalDamodar/airplay-tv.git
-   cd airplay-tv
+   git clone https://github.com/AmalDamodar/airtv-play.git
+   cd airtv-play
    adb connect YOUR_TV_IP:5555
    ```
 4. Look at the TV: tick **Always allow from this computer** and choose **OK**. Then run `adb devices`. It must show
@@ -110,8 +107,8 @@ The Windows steps were not tested on a Windows PC; they use the official winget 
    ```sh
    brew install git
    brew install --cask android-platform-tools
-   git clone https://github.com/AmalDamodar/airplay-tv.git
-   cd airplay-tv
+   git clone https://github.com/AmalDamodar/airtv-play.git
+   cd airtv-play
    adb connect YOUR_TV_IP:5555
    ```
 4. If macOS asks to allow Terminal to find devices on your local network, click **Allow**. Look at the TV: tick
@@ -140,10 +137,10 @@ On the iPhone: **Control Center, Screen Mirroring, pick your TV's name.** Both d
 
 ## Send files to the TV
 
-Open the **Receive** tab in the app. The TV shows a QR code, an address (like `http://192.168.1.50:8765`) and a 4-digit PIN.
+Open the app (the **Home** screen). The TV shows a QR code, an address (like `http://192.168.1.50:8765`) and a 4-digit PIN.
 On the iPhone, iPad or Mac, scan the code with the camera (or type the address in a browser on the same Wi-Fi), choose
-the files and wait until each one says Done. They are saved on the TV in **Downloads, in the folder AirPlay TV**.
-On the TV, the right side of the Receive tab lists what arrived. Each file has three buttons: **Open** (with an app on
+the files and wait until each one says Done. They are saved on the TV in **Downloads, in the folder AirTV Play**.
+On the TV, the list under the QR code shows what arrived (it scrolls). Each file has three buttons: **Open** (with an app on
 the TV: a video in a video player, an APK in the system installer), **Show in folder** (opens the separate Files app at that folder, see below) and
 **Delete**. Delete asks whether to delete the file from the TV or only remove it from the list.
 
@@ -151,16 +148,16 @@ the TV: a video in a video player, an APK in the system installer), **Show in fo
 - Big files are fine: they are written straight to storage while they arrive (a 600 MB video was sent and compared
   byte for byte). Speed is limited by your Wi-Fi; about 7.5 MB/s on the test TV, so a 2 GB movie takes about 5 minutes.
 - Only devices on your own network can connect, and every upload needs the PIN. Five wrong PINs lock that device out for
-  a minute. The receiver runs only while the Receive tab is open (it also closes after 30 minutes without use).
+  a minute. The receiver runs only while the Home screen is open (it also closes after 30 minutes without use).
 - **Open** hands the file to whatever app on the TV can show it. If none can, you get a message. A TV usually has no
   gallery or document viewer, so photos and text files may need an app installed first. For an APK, Android asks once
   to allow installs from this app.
 
 ## Browse the TV's files
 
-AirPlay TV does not browse files itself any more. The file manager is its own small app, **Files**, from the
+AirTV Play does not browse files itself any more. The file manager is its own small app, **Files**, from the
 [MinimalTV project](https://github.com/AmalDamodar/minimaltv) (`files/` there). With it installed, **Show in folder**
-on the Receive tab opens Files at the folder the received files are in. Without it, that button says so and the rest of
+in that list opens Files at the folder the received files are in. Without it, that button says so and the rest of
 the app works as before. Receiving, opening and deleting received files need no storage permission.
 
 ## What works, what does not

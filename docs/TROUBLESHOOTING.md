@@ -20,7 +20,7 @@ Connection problems between the computer and the TV (`unauthorized`, `offline`, 
 | The TV is not listed after it has been off or asleep | Check **Start server at boot** and **Run in background** are ON in the app, and run `./scripts/install.sh` again (it re-applies the battery and background permissions). Then restart the TV once |
 | The receiver does not open on the TV when a phone connects | The app needs **Display over other apps**. `./scripts/check.sh` shows whether it is allowed. If not, run `./scripts/install.sh` again, or allow it in the TV's own Settings, Apps, the receiver, Permissions |
 | `check.sh` says "listening on port 7000: no" but the app is running | The port can be changed in the app. If you changed **Server port**, that is expected |
-| Checksum mismatch on install | The download was damaged and was deleted. Run `./scripts/install.sh` again. If it keeps failing, download the file from the [release page](https://github.com/AmalDamodar/airplay-tv/releases/tag/v2.2.0) yourself and run `./scripts/install.sh --apk /path/to/file.apk` |
+| Checksum mismatch on install | The download was damaged and was deleted. Run `./scripts/install.sh` again. If it keeps failing, download the file from the [release page](https://github.com/AmalDamodar/airtv-play/releases/tag/v2.2.0) yourself and run `./scripts/install.sh --apk /path/to/file.apk` |
 | `INSTALL_FAILED_...` from adb | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` means a copy signed by someone else is installed: run `./scripts/uninstall.sh`, then install again. `INSTALL_FAILED_INSUFFICIENT_STORAGE`: free space on the TV (uninstall unused apps) |
 | The picture is jerky | Move the TV and iPhone closer to the router, or put the TV on Ethernet. Mirroring sends the whole screen over the network |
 

@@ -4,19 +4,19 @@
 # Environment:
 #   ADB             adb binary to use (default: adb)
 #   ANDROID_SERIAL  device to talk to, e.g. 192.168.1.50:5555 (needed when more than one device is connected)
-#   AIRPLAY_TV_CACHE  where the downloaded APK is kept (default: ~/.airplay-tv)
+#   AIRTV_PLAY_CACHE  where the downloaded APK is kept (default: ~/.airtv-play)
 
 ADB="${ADB:-adb}"
-CACHE="${AIRPLAY_TV_CACHE:-$HOME/.airplay-tv}"
+CACHE="${AIRTV_PLAY_CACHE:-$HOME/.airtv-play}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# The receiver app: AirPlay TV (a GPLv3 fork of Shield AirPlay), built from this repository. Pinned to the version this project was tested with.
+# The receiver app: AirTV Play (a GPLv3 fork of Shield AirPlay), built from this repository. Pinned to the version this project was tested with.
 PKG="com.minimaltv.airplay"
 OLD_PKG="no.gior.shieldairplay"   # the original app; it uses the same port, so the two cannot run together
-APP_NAME="AirPlay TV"
-APP_VERSION="2.2.0"
-APK_NAME="AirPlay-TV.apk"
-APK_URL="https://github.com/AmalDamodar/airplay-tv/releases/download/v2.2.0/$APK_NAME"
+APP_NAME="AirTV Play"
+APP_VERSION="2.3.0"
+APK_NAME="AirTV-Play.apk"
+APK_URL="https://github.com/AmalDamodar/airtv-play/releases/download/v2.3.0/$APK_NAME"
 APK_SHA256="42c53e2fb123ba567b3f2571f01cc31689125438f33fc86bdf3e4f62bcb3911f"
 
 die() { echo "error: $*" >&2; exit 1; }

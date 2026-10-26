@@ -32,6 +32,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.draw.clip
@@ -59,7 +60,7 @@ import kotlin.math.roundToInt
 
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel) {
+fun SettingsScreen(viewModel: MainViewModel, onOpenLogs: () -> Unit = {}) {
     val serverName by viewModel.serverName.collectAsState()
     val h265Enabled by viewModel.h265Enabled.collectAsState()
     val enforceSdr by viewModel.enforceSdr.collectAsState()
@@ -182,6 +183,12 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 )
             }
             SettingsGroup(null) {
+                SettingsRow(
+                    modifier = Modifier.dpadFocus(FocusShape, focusScale = 1f).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onOpenLogs),
+                    headlineContent = { Text(stringResource(R.string.tab_logs)) },
+                    supportingContent = { Text(stringResource(R.string.logs_intro)) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                )
                 AdvancedHeader(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen })
             }
             if (advancedOpen) {

@@ -60,7 +60,7 @@ object FileReceiver {
     private const val MAX_FAILS = 5
     private const val LOCK_MS = 60_000L
     private const val IDLE_STOP_MS = 30L * 60_000
-    private const val REL_PATH = "Download/AirPlay TV/"
+    private const val REL_PATH = "Download/AirTV Play/"
 
     private var app: Context? = null
     private var server: ServerSocket? = null
@@ -448,7 +448,7 @@ object FileReceiver {
             }
 
             private fun openFile(ctx: Context, name: String): Sink? {
-                val dir = File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "AirPlay TV").apply { mkdirs() }
+                val dir = File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "AirTV Play").apply { mkdirs() }
                 var target = File(dir, name)
                 var i = 1
                 val base = name.substringBeforeLast('.', name)

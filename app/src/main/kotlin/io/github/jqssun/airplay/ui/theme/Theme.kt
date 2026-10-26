@@ -121,7 +121,7 @@ private val OutfitFamily = FontFamily(
 )
 
 private fun TextStyle.styled(tv: Boolean, weight: FontWeight? = null): TextStyle {
-    val scale = if (tv) 1.15f else 1f
+    val scale = if (tv) 1.05f else 1f
     return copy(
         fontFamily = OutfitFamily,
         fontSize = fontSize * scale,

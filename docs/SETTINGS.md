@@ -30,7 +30,7 @@ and other videos play with sound on the TV.
 **Control Center, Screen Mirroring** on the iPhone instead.
 
 If you prefer the hand-off and your iPhone and TV handle it, turn video support back on there, then choose **Stop** and
-**Start** on the Overview screen so the receiver announces itself again.
+**Start** on the Home screen so the receiver announces itself again.
 
 ## Things that were tried and were not the cause
 
@@ -47,5 +47,5 @@ Check that **Advertise AirPlay audio support** is **on**. With it off, the sound
 
 On the test TV the engine's settings were read from the app's own screen: video support off, audio support on, ALAC off,
 AAC on, and mirroring of YouTube, Shorts and videos with sound from an iPhone was confirmed working by the TV's owner
-with the original Shield AirPlay app. AirPlay TV has the same engine and the same defaults, and mirroring from an iPhone
+with the original Shield AirPlay app. AirTV Play has the same engine and the same defaults, and mirroring from an iPhone
 (including YouTube with sound) was confirmed with it on the same TV. Other TVs and other iPhone, iPad or Mac models were not tested.

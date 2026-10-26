@@ -80,8 +80,8 @@ Debian and Ubuntu: `sudo apt install adb git curl`. Fedora: `sudo dnf install an
 ### Download this project (all computers)
 
 ```sh
-git clone https://github.com/AmalDamodar/airplay-tv.git
-cd airplay-tv
+git clone https://github.com/AmalDamodar/airtv-play.git
+cd airtv-play
 ```
 
 ## 3. Connect the computer to the TV
@@ -134,9 +134,9 @@ Optional, with the remote:
 
 1. In the app, move left to the menu and choose **Settings**.
 2. At the top, change **Server name** to what your iPhone should show, for example "Living Room". The default is "TV".
-3. Go back to **Overview**. It should say **Ready**. If it says Stopped, choose **Start**.
+3. Go back to **Home**. It should say **Ready**. If it says Stopped, choose **Start**.
 
-Careful with the remote on the Overview screen: the big button there is **Stop** while the receiver runs, so pressing OK
+Careful with the remote on the Home screen: the button at the top right is **Stop** while the receiver runs, so pressing OK
 twice in a row stops it.
 
 Then check from the computer:

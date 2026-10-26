@@ -38,18 +38,18 @@ code are unchanged.
 
 ## 2.0.1-tv.1
 
-- Renamed to AirPlay TV (app label, release file `AirPlay-TV.apk`). The installer scripts and guides that lived in a
-  separate repository (`airplay-tv`) are now in this one (`scripts/`, `docs/`).
+- Renamed to AirTV Play (app label, release file `AirTV-Play.apk`). The installer scripts and guides that lived in a
+  separate repository (`airtv-play`) are now in this one (`scripts/`, `docs/`).
 - No functional change to the receiver.
 
 ## 2.1.0
 
 - New **Files** tab: receive files from a phone or computer in a browser (`files/FileReceiver.kt`, the page in
   `assets/receive.html`, the screen in `ui/FilesScreen.kt`). QR code made with ZXing core (Apache License 2.0). Files go
-  to Downloads/AirPlay TV through MediaStore. The server runs only while the tab is open and needs the PIN shown on the TV. The screen has the connection details
+  to Downloads/AirTV Play through MediaStore. The server runs only while the tab is open and needs the PIN shown on the TV. The screen has the connection details
   on the left and the received files on the right; each received file can be opened with an app on the TV (adds the
   `REQUEST_INSTALL_PACKAGES` permission so an APK can go to the system installer). Per-file buttons: Open, Show in
-  folder (hands the Downloads/AirPlay TV folder to a file manager if the TV has one) and Delete (delete the file, or
+  folder (hands the Downloads/AirTV Play folder to a file manager if the TV has one) and Delete (delete the file, or
   only remove it from the list).
 
 ### Files tab fixes (still 2.1.0)
@@ -68,7 +68,7 @@ code are unchanged.
 
 - The receiving screen is now the **Receive** tab. A new **Files** tab (`ui/StorageScreen.kt`) browses internal storage
   and USB drives with the remote: OK opens, Back goes up, trash deletes after asking. "Show in folder" on the Receive
-  tab opens it at Download/AirPlay TV.
+  tab opens it at Download/AirTV Play.
 - Manifest: `READ/WRITE_EXTERNAL_STORAGE`, `MANAGE_EXTERNAL_STORAGE` (for Android 11+) and
   `requestLegacyExternalStorage` (honoured on Android 10). The file provider now covers any path, only to hand a file you
   opened to another app. Deleting also tells the media database, so no stale entries are left.
@@ -81,7 +81,19 @@ code are unchanged.
 
 - The file manager (the old Files tab, `ui/StorageScreen.kt`) moved out of this app into its own app, **Files**
   (`com.minimaltv.files`, in the MinimalTV project). The rail now has Overview, Receive, Logs and Settings.
-- **Show in folder** on the Receive tab starts the Files app at Download/AirPlay TV (explicit intent with the extra
+- **Show in folder** on the Receive tab starts the Files app at Download/AirTV Play (explicit intent with the extra
   `com.minimaltv.files.PATH`), or shows a message when Files is not installed.
 - The app no longer asks for storage permissions (`READ/WRITE/MANAGE_EXTERNAL_STORAGE`, legacy storage). The FileProvider
   only serves the exported log file. Received files are still written and deleted through MediaStore.
+
+## 2.3.0
+
+- Renamed to **AirTV Play** (app label, release file `AirTV-Play.apk`, repository `airtv-play`, the folder received
+  files are saved in: `Download/AirTV Play`). The application id `com.minimaltv.airplay` is unchanged so an update
+  installs over the old app and keeps its settings. Files already received stay in `Download/AirPlay TV`; nothing is moved.
+- New, compact **Home** screen: one slim status card on top (name, status, how to connect, Start/Stop), a wide card with
+  the QR code, address and PIN, and the list of received files below it (scrolls). The separate Overview and Receive tabs
+  are gone. While a phone is connected, the card area shows the picture or the audio player instead.
+- **Logs** moved into Settings (one row). The navigation rail is now two icons, slimmer; text and padding are a little smaller.
+- New launcher icon and banner: a screen with a play triangle, flat and minimal.
+

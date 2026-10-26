@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,16 +63,18 @@ import kotlinx.coroutines.delay
 private val RowShape = RoundedCornerShape(16.dp)
 
 /**
- * Receive files from a phone or computer. The receiver runs only while this screen is open, so nothing listens on
- * the network the rest of the time. Left: how to connect. Right: what has arrived, each file can be opened.
+ * Receiving files, as part of the Home screen: a wide card with the QR code, the address and the PIN, and below it
+ * the list of what has arrived (scrollable, each file can be opened, shown in the Files app or deleted). The
+ * receiver runs only while this section is on screen and Home is selected, so nothing listens on the network the
+ * rest of the time.
  */
 @Composable
-fun FilesScreen() {
+internal fun ReceiveSection(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val view = LocalView.current
     val st by FileReceiver.state.collectAsState()
 
-    // Starting is safe to repeat. Stopping happens when the tab is left (MainScreen) or the app is closed, not when
+    // Starting is safe to repeat. Stopping happens when Home is left (MainScreen) or the app is closed, not when
     // Android merely rebuilds the screen, so a transfer is not cut off by that.
     DisposableEffect(Unit) {
         FileReceiver.start(ctx)
@@ -82,66 +85,45 @@ fun FilesScreen() {
         while (true) { delay(5_000); FileReceiver.refreshAddress() }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        val wide = maxWidth >= 640.dp
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
-                Text(stringResource(R.string.files_title), style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    stringResource(R.string.files_intro),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (wide) {
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ConnectPanel(st, Modifier.width(330.dp).fillMaxHeight())
-                    ReceivedPanel(st, Modifier.weight(1f).fillMaxHeight())
-                }
-            } else {
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ConnectPanel(st, Modifier.fillMaxWidth())
-                    ReceivedPanel(st, Modifier.fillMaxWidth().height(360.dp))
-                }
-            }
-        }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ConnectCard(st, Modifier.fillMaxWidth())
+        ReceivedPanel(st, Modifier.weight(1f).fillMaxWidth())
     }
 }
 
-/** QR code, address and PIN. */
+/** One wide row: the QR code on the left; what to do, the address and the PIN on the right. */
 @Composable
-private fun ConnectPanel(st: FileReceiver.State, modifier: Modifier) {
+private fun ConnectCard(st: FileReceiver.State, modifier: Modifier) {
     val g = LocalGlass.current
-    Column(
-        modifier.glass().padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        modifier.glass().padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         val url = st.url
         if (url != null && st.running) {
-            QrCode(url, Modifier.size(150.dp))
-            Text(
-                stringResource(R.string.files_scan),
-                style = MaterialTheme.typography.bodySmall, color = g.textDim, textAlign = TextAlign.Center,
-            )
-            Text(st.shownUrl ?: "", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = g.text, maxLines = 1)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.files_pin), style = MaterialTheme.typography.titleSmall, color = g.textDim)
+            QrCode(url, Modifier.size(118.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(stringResource(R.string.files_card_title), style = MaterialTheme.typography.titleMedium, color = g.text)
+                Text(stringResource(R.string.files_scan), style = MaterialTheme.typography.bodySmall, color = g.textDim)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(st.shownUrl ?: "", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = g.text, maxLines = 1)
+                    Text(
+                        st.pin,
+                        fontSize = 19.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp, color = g.text,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(g.pill).padding(horizontal = 12.dp, vertical = 3.dp),
+                    )
+                }
                 Text(
-                    st.pin,
-                    fontSize = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 5.sp, color = g.text,
-                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(g.pill).padding(horizontal = 14.dp, vertical = 4.dp),
+                    stringResource(R.string.files_pin_hint) + " " + stringResource(R.string.files_saved_in),
+                    style = MaterialTheme.typography.bodySmall, color = g.textDim,
                 )
             }
-            Text(
-                stringResource(R.string.files_pin_hint) + " " + stringResource(R.string.files_saved_in),
-                style = MaterialTheme.typography.bodySmall, color = g.textDim, textAlign = TextAlign.Center,
-            )
         } else {
             Text(
                 stringResource(when (st.error) { null -> R.string.files_no_network; "idle" -> R.string.files_idle; else -> R.string.files_port_busy }),
-                style = MaterialTheme.typography.titleMedium, color = g.textDim, textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium, color = g.textDim,
+                modifier = Modifier.padding(vertical = 30.dp),
             )
         }
     }
@@ -154,11 +136,11 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
     val ctx = LocalContext.current
     val cur = st.current
     var toDelete by remember { mutableStateOf<FileReceiver.Received?>(null) }
-    Column(modifier.glass().padding(vertical = 14.dp)) {
+    Column(modifier.glass().padding(vertical = 10.dp)) {
         Text(
             stringResource(R.string.files_received),
-            style = MaterialTheme.typography.titleMedium, color = g.textDim,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
+            style = MaterialTheme.typography.titleSmall, color = g.textDim,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
         )
         if (cur != null) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -179,7 +161,10 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
                 Text(stringResource(R.string.files_none), style = MaterialTheme.typography.bodyMedium, color = g.textDim)
             }
         } else {
-            LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            val listState = rememberLazyListState()
+            // a new arrival goes on top; without this the list keeps showing the older rows it was on
+            LaunchedEffect(st.received.size) { listState.scrollToItem(0) }
+            LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp), state = listState) {
                 items(st.received, key = { System.identityHashCode(it) }) { r ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
@@ -257,7 +242,7 @@ private const val FILES_PACKAGE = "com.minimaltv.files"
 
 /** Opens the Files app (a separate app from the MinimalTV setup) at the folder the received files are saved in. */
 private fun showInFilesApp(ctx: Context) {
-    val folder = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Download/AirPlay TV")
+    val folder = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Download/AirTV Play")
     val intent = Intent().setClassName(FILES_PACKAGE, "$FILES_PACKAGE.MainActivity")
         .putExtra("$FILES_PACKAGE.PATH", folder.absolutePath)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
