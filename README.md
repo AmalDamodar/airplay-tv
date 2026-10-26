@@ -3,7 +3,7 @@
 Show your iPhone, iPad or Mac screen on an Android TV, with sound, using AirPlay. No Apple TV needed. It can also
 receive files (movies, videos, photos, APK files) sent from a phone or computer, with nothing to install on the phone.
 
-This repository has the receiver app (a clean, Apple-style Liquid Glass interface on an open-source AirPlay engine),
+This repository has the receiver app (a clean glass interface with glowing tiles on an open-source AirPlay engine),
 the installer scripts that put it on your TV, and a beginner guide. Mirroring settings that keep YouTube stable are
 already built in.
 
@@ -25,7 +25,7 @@ already built in.
 
 ## What is different from the original app
 
-- **New interface.** Frosted glass panels over a blurred wallpaper, Outfit font, light and dark themes. The option you
+- **New interface.** Glowing rounded tiles and frosted glass panels on a dark background, Outfit font, light and dark themes. The option you
   have selected gets one soft highlight, nothing else. The status dot glows green when the receiver is ready or
   streaming, yellow while a device is connecting, and red when stopped or in error.
 - **Minimal settings.** The first screen has only what most people need: the receiver name, start at boot, run in

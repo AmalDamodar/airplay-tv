@@ -24,6 +24,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.BrightnessHigh
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,6 +55,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -85,8 +91,8 @@ import kotlin.math.abs
 import kotlinx.coroutines.delay
 
 private enum class Tab(val labelRes: Int, val icon: ImageVector) {
-    HOME(R.string.tab_home, Icons.Default.Home),
-    SETTINGS(R.string.tab_settings, Icons.Default.Settings)
+    HOME(R.string.tab_home, Icons.Rounded.Home),
+    SETTINGS(R.string.tab_settings, Icons.Rounded.Settings)
 }
 
 @Composable
@@ -566,44 +572,24 @@ fun MainScreen(
                 }
             }
         ) { padding ->
-            Row(
+            Column(
                 Modifier.fillMaxSize().padding(padding)
-                    .padding(horizontal = if (tv) 32.dp else 0.dp, vertical = if (tv) 20.dp else 0.dp),
-                horizontalArrangement = Arrangement.spacedBy(if (tv) 16.dp else 0.dp),
+                    .padding(horizontal = if (tv) 40.dp else 0.dp, vertical = if (tv) 24.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(if (tv) 16.dp else 0.dp),
             ) {
-                if (tv) {
-                    NavigationRail(
-                        modifier = Modifier.fillMaxHeight().width(72.dp).glass(RoundedCornerShape(24.dp)),
-                        containerColor = Color.Transparent,
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                    ) {
-                        Spacer(Modifier.weight(1f))
-                        Tab.entries.forEach { t ->
-                            NavigationRailItem(
-                                selected = tab == t,
-                                onClick = { tab = t },
-                                icon = { Icon(t.icon, stringResource(t.labelRes)) },
-                                colors = glassNavColors(),
-                                modifier = Modifier.padding(vertical = 6.dp),
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                    }
+                if (tv) TvHeader(tab, onTab = { tab = it }, viewModel)
+                Box(Modifier.weight(1f)) {
+                    TabContent(
+                        tab, viewModel, video,
+                        onFullscreen = { fullscreen = true }, onPip = onPip, showAudioMode = audioOnly,
+                    )
                 }
-                Column(Modifier.weight(1f)) {
-                    Box(Modifier.weight(1f)) {
-                        TabContent(
-                            tab, viewModel, video,
-                            onFullscreen = { fullscreen = true }, onPip = onPip, showAudioMode = audioOnly,
-                        )
-                    }
-                    if (tv) {
-                        AudioMiniController(
-                            viewModel,
-                            visible = audioOnly && connections > 0 && tab != Tab.HOME,
-                            onClick = { tab = Tab.HOME }
-                        )
-                    }
+                if (tv) {
+                    AudioMiniController(
+                        viewModel,
+                        visible = audioOnly && connections > 0 && tab != Tab.HOME,
+                        onClick = { tab = Tab.HOME }
+                    )
                 }
             }
         }
@@ -658,6 +644,10 @@ private fun TabContent(
     }
 }
 
+/**
+ * Home: the receiver tile, the "Send files" tile and what was received, as a grid of glowing tiles. While a phone is
+ * connected the grid gives way to the mirrored picture or the audio player.
+ */
 @Composable
 private fun HomeContent(
     viewModel: MainViewModel,
@@ -674,70 +664,91 @@ private fun HomeContent(
     val tv = isTv()
     val live = state == ServerState.RUNNING && connections > 0
 
-    Column(
-        Modifier.fillMaxSize().padding(if (tv) 0.dp else 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        // what the receiver is doing and how to reach it, in one compact card on top
-        Row(
-            Modifier.fillMaxWidth().glass().padding(horizontal = 18.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = serverName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
+    if (live) {
+        Column(Modifier.fillMaxSize().padding(if (tv) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // on a TV the status and Stop sit in the header
+            if (!tv) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     ReceiverStatus(state, connections, connecting = !mirroringActive && !videoPlaybackActive)
+                    StopButton { viewModel.stopServer() }
                 }
-                Text(
-                    text = when (state) {
-                        ServerState.RUNNING -> stringResource(R.string.receiver_cast_help, serverName)
-                        ServerState.STOPPED -> stringResource(R.string.server_stopped)
-                        ServerState.ERROR -> stringResource(R.string.error_starting_server)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
-            Button(
-                onClick = {
-                    if (state == ServerState.RUNNING) viewModel.stopServer()
-                    else viewModel.startServer()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.secondaryContainer
-                        else MaterialTheme.colorScheme.primary,
-                    contentColor = if (state == ServerState.RUNNING) MaterialTheme.colorScheme.onSecondaryContainer
-                        else MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = CircleShape,
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                modifier = Modifier.heightIn(min = 44.dp).dpadFocus(CircleShape),
-            ) {
-                Icon(
-                    imageVector = if (state == ServerState.RUNNING) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(if (state == ServerState.RUNNING) stringResource(R.string.btn_stop) else stringResource(R.string.btn_start))
-            }
-        }
-
-        if (live) {
             LiveArea(viewModel, video, onFullscreen, onPip, showAudioMode, Modifier.weight(1f).fillMaxWidth())
-        } else {
-            ReceiveSection(Modifier.weight(1f).fillMaxWidth())
         }
+    } else {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val compact = maxWidth < 700.dp
+            ReceiveSection(Modifier.fillMaxSize().padding(if (compact) 12.dp else 0.dp), compact) { tileModifier ->
+                MirrorTile(
+                    name = serverName, state = state, connections = connections,
+                    connecting = !mirroringActive && !videoPlaybackActive,
+                    onToggle = { if (state == ServerState.RUNNING) viewModel.stopServer() else viewModel.startServer() },
+                    modifier = tileModifier,
+                )
+            }
+        }
+    }
+}
+
+/** The top bar on a TV: the app name on the left, the Home / Settings switch on the right. */
+@Composable
+private fun TvHeader(tab: Tab, onTab: (Tab) -> Unit, viewModel: MainViewModel) {
+    val g = LocalGlass.current
+    val state by viewModel.serverState.collectAsState()
+    val connections by viewModel.connectionCount.collectAsState()
+    val mirroringActive by viewModel.mirroringActive.collectAsState()
+    val videoPlaybackActive by viewModel.videoPlaybackActive.collectAsState()
+    val live = state == ServerState.RUNNING && connections > 0 && tab == Tab.HOME
+    Row(Modifier.fillMaxWidth().height(48.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).background(Brush.linearGradient(listOf(Color(0xFF6B70E0), Color(0xFF3E43B0))), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Rounded.Cast, null, Modifier.size(22.dp), tint = Color.White) }
+            Text(stringResource(R.string.app_name), color = g.text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (live) {
+                ReceiverStatus(state, connections, connecting = !mirroringActive && !videoPlaybackActive)
+                StopButton { viewModel.stopServer() }
+            }
+            Row(Modifier.glass(CircleShape).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Tab.entries.forEach { t ->
+                    val chosen = tab == t
+                    Row(
+                        Modifier
+                            .dpadFocus(CircleShape)
+                            .clip(CircleShape)
+                            .background(if (chosen) g.pill else Color.Transparent)
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTab(t) }
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(t.icon, null, Modifier.size(20.dp), tint = if (chosen) g.text else g.textDim)
+                        Text(stringResource(t.labelRes), style = MaterialTheme.typography.labelLarge, color = if (chosen) g.text else g.textDim)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A round-ended frosted button that stops the receiver. */
+@Composable
+private fun StopButton(onClick: () -> Unit) {
+    val g = LocalGlass.current
+    Row(
+        Modifier
+            .glass(CircleShape)
+            .dpadFocus(CircleShape)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(start = 12.dp, end = 18.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(Icons.Rounded.Stop, null, Modifier.size(20.dp), tint = g.text)
+        Text(stringResource(R.string.btn_stop), style = MaterialTheme.typography.labelLarge, color = g.text)
     }
 }
 
@@ -758,7 +769,7 @@ private fun LiveArea(
     val videoPlaybackActive by viewModel.videoPlaybackActive.collectAsState()
     val debugEnabled by viewModel.debugEnabled.collectAsState()
     val debugInfo by viewModel.debugInfo.collectAsState()
-    Box(modifier.glass(), contentAlignment = Alignment.Center) {
+    Box(modifier.glass(TileShape), contentAlignment = Alignment.Center) {
         val connecting = state == ServerState.RUNNING && connections > 0 &&
             !mirroringActive && !videoPlaybackActive
         if (showAudioMode) {

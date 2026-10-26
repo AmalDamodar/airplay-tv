@@ -224,6 +224,9 @@
     <string name="files_idle">The receiver stopped after 30 minutes without use. Leave this tab and open Files again.</string>
     <string name="files_port_busy">Could not open the receiving port</string>
     <string name="files_received">Received</string>
+    <string name="files_tile_title">Send files</string>
+    <string name="files_scan_short">Scan the code, or open the address in a browser on the same Wi-Fi</string>
+    <string name="files_receiving_now">Receiving</string>
     <string name="files_none">Nothing received yet</string>
     <string name="files_receiving">Receiving %1$s</string>
     <string name="files_open">Open</string>

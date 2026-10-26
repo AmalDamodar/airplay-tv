@@ -6,16 +6,14 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,10 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.jqssun.airplay.R
 import io.github.jqssun.airplay.service.AirPlayService.ServerState
 
@@ -36,8 +35,8 @@ private val StatusYellow = Color(0xFFFFC21F)
 private val StatusRed = Color(0xFFFF5A52)
 
 /**
- * Status chip. The dot glows green when the receiver is ready or streaming, yellow (breathing) while a device is
- * connecting, red when stopped or in error.
+ * Status chip: a dark frosted pill with a glowing dot, green when the receiver is ready or streaming, yellow
+ * (breathing) while a device is connecting, red when stopped or in error. Meant to sit on a coloured tile.
  */
 @Composable
 internal fun ReceiverStatus(state: ServerState, connections: Int = 0, connecting: Boolean = false) {
@@ -47,25 +46,24 @@ internal fun ReceiverStatus(state: ServerState, connections: Int = 0, connecting
         waiting -> StatusYellow
         else -> StatusGreen
     }
-    Surface(color = color.copy(alpha = 0.16f), shape = CircleShape) {
-        Row(
-            Modifier.padding(start = 8.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            GlowDot(color, breathing = waiting)
-            Text(
-                when {
-                    state == ServerState.ERROR -> stringResource(R.string.error_label)
-                    state == ServerState.STOPPED -> stringResource(R.string.stopped_label)
-                    waiting -> stringResource(R.string.connecting_label)
-                    connections > 0 -> stringResource(R.string.connected_count, connections)
-                    else -> stringResource(R.string.ready_label)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+    Row(
+        Modifier.background(Color.Black.copy(alpha = 0.28f), CircleShape)
+            .padding(start = 8.dp, end = 14.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        GlowDot(color, breathing = waiting)
+        Text(
+            when {
+                state == ServerState.ERROR -> stringResource(R.string.error_label)
+                state == ServerState.STOPPED -> stringResource(R.string.stopped_label)
+                waiting -> stringResource(R.string.connecting_label)
+                connections > 0 -> stringResource(R.string.connected_count, connections)
+                else -> stringResource(R.string.ready_label)
+            },
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+        )
     }
 }
 
@@ -95,92 +93,60 @@ private fun GlowDot(color: Color, breathing: Boolean) {
     }
 }
 
+/** The small "Start" / "Stop" label on the tile. Only a label: the whole tile is the button. */
 @Composable
-internal fun ReceiverHero(name: String, state: ServerState) {
-    val tv = isTv()
-    // Scroll only on compact/tall-text layouts; no focusable decoration competes with Start.
-    BoxWithConstraints(
-        Modifier.fillMaxSize().padding(if (tv) 24.dp else 20.dp)
+internal fun ActionPill(running: Boolean) {
+    Row(
+        Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape).padding(start = 10.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val wide = maxWidth >= 540.dp
-        val glyph: @Composable () -> Unit = {
-            ReceiverGlyph(running = state == ServerState.RUNNING, modifier = Modifier.size(if (wide) 148.dp else 88.dp))
-        }
-        val details: @Composable () -> Unit = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ReceiverStatus(state)
-                Text(
-                    name,
-                    style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    stringResource(when (state) {
-                        ServerState.RUNNING -> R.string.receiver_ready_title
-                        ServerState.STOPPED -> R.string.server_stopped
-                        ServerState.ERROR -> R.string.error_starting_server
-                    }),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.receiver_cast_help, name),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.receiver_network_help),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (wide) {
-            Row(
-                Modifier.align(Alignment.Center).verticalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(32.dp),
-            ) {
-                glyph()
-                Box(Modifier.weight(1f)) { details() }
-            }
-        } else {
-            Column(
-                Modifier.align(Alignment.Center).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                glyph()
-                details()
-            }
-        }
+        Icon(if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp), tint = Color.White)
+        Text(
+            stringResource(if (running) R.string.btn_stop else R.string.btn_start),
+            style = MaterialTheme.typography.labelLarge, color = Color.White,
+        )
     }
 }
 
+/**
+ * The first tile on Home: what the receiver is doing and how to reach it. Violet while it runs, grey when stopped.
+ * Selecting it starts or stops the receiver.
+ */
 @Composable
-private fun ReceiverGlyph(running: Boolean, modifier: Modifier = Modifier) {
-    val primary = MaterialTheme.colorScheme.primary
-    Box(modifier, contentAlignment = Alignment.Center) {
-        // Only composed while running and idle. Works on API 30 without blur/render effects.
-        if (running) {
-            val transition = rememberInfiniteTransition(label = "receiverPulse")
-            val pulse by transition.animateFloat(
-                initialValue = 0.88f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Reverse),
-                label = "receiverRing",
-            )
-            Box(
-                Modifier.fillMaxSize()
-                    .graphicsLayer { scaleX = pulse; scaleY = pulse; alpha = 0.35f }
-                    .border(1.dp, primary, CircleShape)
-            )
-        }
-        Box(
-            Modifier.fillMaxSize(0.75f).background(primary.copy(alpha = 0.08f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.Cast, null, Modifier.fillMaxSize(0.55f), tint = primary)
+internal fun MirrorTile(
+    name: String,
+    state: ServerState,
+    connections: Int,
+    connecting: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val running = state == ServerState.RUNNING
+    GlowTile(if (running) TileColors.Violet else TileColors.Slate, modifier, onClick = onToggle) {
+        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                IconChip(Icons.Rounded.Cast)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ReceiverStatus(state, connections, connecting)
+                    ActionPill(running)
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    name, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(when (state) {
+                        ServerState.RUNNING -> R.string.receiver_cast_help
+                        ServerState.STOPPED -> R.string.server_stopped
+                        ServerState.ERROR -> R.string.error_starting_server
+                    }, name),
+                    style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

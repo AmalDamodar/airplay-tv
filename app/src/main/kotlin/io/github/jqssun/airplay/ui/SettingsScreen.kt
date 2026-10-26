@@ -105,7 +105,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenLogs: () -> Unit = {}) {
                 .padding(horizontal = if (isTv()) 12.dp else 16.dp, vertical = if (isTv()) 4.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 6.dp)) {
+            // on a TV the header already says Settings
+            if (!isTv()) Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 6.dp)) {
                 Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineLarge)
                 Text(
                     stringResource(R.string.settings_intro),
@@ -522,8 +523,8 @@ private val FocusShape = RoundedCornerShape(20.dp)
 @Composable
 private fun glassSwitchColors(): SwitchColors {
     val g = LocalGlass.current
-    val onTrack = g.text
-    val onThumb = if (g.dark) Color(0xFF111114) else Color.White
+    val onTrack = Color(0xFF13C48B)
+    val onThumb = Color.White
     val offTrack = if (g.dark) Color(0x33FFFFFF) else Color(0x33000000)
     val offThumb = if (g.dark) Color(0xE6FFFFFF) else Color.White
     return SwitchDefaults.colors(

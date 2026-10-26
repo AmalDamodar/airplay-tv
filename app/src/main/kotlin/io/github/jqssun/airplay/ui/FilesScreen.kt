@@ -10,16 +10,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,16 +46,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.shape.CircleShape
-import io.github.jqssun.airplay.ui.requestFocusUntilLanded
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,16 +65,16 @@ import io.github.jqssun.airplay.R
 import io.github.jqssun.airplay.files.FileReceiver
 import kotlinx.coroutines.delay
 
-private val RowShape = RoundedCornerShape(16.dp)
+private val CardShape = RoundedCornerShape(24.dp)
 
 /**
- * Receiving files, as part of the Home screen: a wide card with the QR code, the address and the PIN, and below it
- * the list of what has arrived (scrollable, each file can be opened, shown in the Files app or deleted). The
- * receiver runs only while this section is on screen and Home is selected, so nothing listens on the network the
- * rest of the time.
+ * Receiving files, as part of the Home screen. On a TV it is a grid of three tiles: [mirror] (the receiver tile)
+ * and the violet-to-mint "Send files" tile with the QR code on top, and a wide blue "Received" tile below with
+ * what has arrived. On a phone they stack and scroll. The receiver runs only while this section is on screen and
+ * Home is selected, so nothing listens on the network the rest of the time.
  */
 @Composable
-internal fun ReceiveSection(modifier: Modifier = Modifier) {
+internal fun ReceiveSection(modifier: Modifier = Modifier, compact: Boolean = false, mirror: @Composable (Modifier) -> Unit) {
     val ctx = LocalContext.current
     val view = LocalView.current
     val st by FileReceiver.state.collectAsState()
@@ -85,99 +90,90 @@ internal fun ReceiveSection(modifier: Modifier = Modifier) {
         while (true) { delay(5_000); FileReceiver.refreshAddress() }
     }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ConnectCard(st, Modifier.fillMaxWidth())
-        ReceivedPanel(st, Modifier.weight(1f).fillMaxWidth())
-    }
-}
-
-/** One wide row: the QR code on the left; what to do, the address and the PIN on the right. */
-@Composable
-private fun ConnectCard(st: FileReceiver.State, modifier: Modifier) {
-    val g = LocalGlass.current
-    Row(
-        modifier.glass().padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        val url = st.url
-        if (url != null && st.running) {
-            QrCode(url, Modifier.size(118.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(stringResource(R.string.files_card_title), style = MaterialTheme.typography.titleMedium, color = g.text)
-                Text(stringResource(R.string.files_scan), style = MaterialTheme.typography.bodySmall, color = g.textDim)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(st.shownUrl ?: "", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = g.text, maxLines = 1)
-                    Text(
-                        st.pin,
-                        fontSize = 19.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp, color = g.text,
-                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(g.pill).padding(horizontal = 12.dp, vertical = 3.dp),
-                    )
-                }
-                Text(
-                    stringResource(R.string.files_pin_hint) + " " + stringResource(R.string.files_saved_in),
-                    style = MaterialTheme.typography.bodySmall, color = g.textDim,
-                )
+    if (compact) {
+        Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            mirror(Modifier.fillMaxWidth().height(170.dp))
+            ConnectTile(st, Modifier.fillMaxWidth().height(230.dp), compact = true)
+            ReceivedTile(st, Modifier.fillMaxWidth().height(260.dp), compact = true)
+        }
+    } else {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.weight(1.15f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                mirror(Modifier.weight(1f).fillMaxHeight())
+                ConnectTile(st, Modifier.weight(1.4f).fillMaxHeight())
             }
-        } else {
-            Text(
-                stringResource(when (st.error) { null -> R.string.files_no_network; "idle" -> R.string.files_idle; else -> R.string.files_port_busy }),
-                style = MaterialTheme.typography.titleMedium, color = g.textDim,
-                modifier = Modifier.padding(vertical = 30.dp),
-            )
+            ReceivedTile(st, Modifier.weight(1f).fillMaxWidth())
         }
     }
 }
 
-/** The file arriving now (with progress) on top, then everything received, newest first. */
+/** Mint tile: what to do on the phone, the address, the PIN, and the QR code that holds all of it. */
 @Composable
-private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
-    val g = LocalGlass.current
+private fun ConnectTile(st: FileReceiver.State, modifier: Modifier, compact: Boolean = false) {
+    GlowTile(TileColors.Mint, modifier) {
+        Row(
+            Modifier.fillMaxSize().padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                IconChip(Icons.Rounded.UploadFile)
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(stringResource(R.string.files_tile_title), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                    val url = st.url
+                    if (url != null && st.running) {
+                        Text(stringResource(R.string.files_scan_short), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(st.shownUrl ?: "", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                            Text(
+                                st.pin, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 3.sp, color = Color.White,
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.22f), CircleShape).padding(horizontal = 12.dp, vertical = 3.dp),
+                            )
+                        }
+                    } else {
+                        Text(
+                            stringResource(when (st.error) { null -> R.string.files_no_network; "idle" -> R.string.files_idle; else -> R.string.files_port_busy }),
+                            style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                }
+            }
+            val url = st.url
+            if (url != null && st.running) QrCode(url, Modifier.size(if (compact) 112.dp else 136.dp))
+        }
+    }
+}
+
+/** Blue tile: the file arriving now (with progress), then everything received, newest first, as a row of cards. */
+@Composable
+private fun ReceivedTile(st: FileReceiver.State, modifier: Modifier, compact: Boolean = false) {
     val ctx = LocalContext.current
     val cur = st.current
     var toDelete by remember { mutableStateOf<FileReceiver.Received?>(null) }
-    Column(modifier.glass().padding(vertical = 10.dp)) {
-        Text(
-            stringResource(R.string.files_received),
-            style = MaterialTheme.typography.titleSmall, color = g.textDim,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
-        )
-        if (cur != null) {
-            Column(Modifier.padding(horizontal = 24.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(cur.name, style = MaterialTheme.typography.bodyLarge, color = g.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                LinearProgressIndicator(
-                    progress = { if (cur.total > 0) cur.done.toFloat() / cur.total else 0f },
-                    modifier = Modifier.fillMaxWidth(), color = g.text, trackColor = g.divider,
-                )
-                val pct = if (cur.total > 0) (100 * cur.done / cur.total).toInt() else 0
-                Text(
-                    "${sizeText(cur.done)} / ${sizeText(cur.total)}  ·  $pct%",
-                    style = MaterialTheme.typography.bodySmall, color = g.textDim,
-                )
+    GlowTile(TileColors.Blue, modifier) {
+        Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.width(if (compact) 110.dp else 190.dp).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                IconChip(Icons.Rounded.Inbox)
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(stringResource(R.string.files_received), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                    if (!compact) Text(stringResource(R.string.files_saved_in), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
+                }
             }
-        }
-        if (st.received.isEmpty() && cur == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.files_none), style = MaterialTheme.typography.bodyMedium, color = g.textDim)
-            }
-        } else {
-            val listState = rememberLazyListState()
-            // a new arrival goes on top; without this the list keeps showing the older rows it was on
-            LaunchedEffect(st.received.size) { listState.scrollToItem(0) }
-            LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp), state = listState) {
-                items(st.received, key = { System.identityHashCode(it) }) { r ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(r.name, style = MaterialTheme.typography.bodyLarge, color = g.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(sizeText(r.size), style = MaterialTheme.typography.bodySmall, color = g.textDim)
-                        }
-                        RowAction(stringResource(R.string.files_open), Icons.AutoMirrored.Filled.OpenInNew, showLabel = true) { openReceived(ctx, r) }
-                        RowAction(stringResource(R.string.files_open_folder), Icons.Default.FolderOpen) { showInFilesApp(ctx) }
-                        RowAction(stringResource(R.string.files_delete), Icons.Default.DeleteOutline) { toDelete = r }
+            if (st.received.isEmpty() && cur == null) {
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.files_none), style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.7f))
+                }
+            } else {
+                val listState = rememberLazyListState()
+                // a new arrival goes first; without this the row keeps showing the older cards it was on
+                LaunchedEffect(st.received.size, cur == null) { listState.scrollToItem(0) }
+                LazyRow(
+                    Modifier.weight(1f).fillMaxHeight(), state = listState,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (cur != null) item(key = "current") { ProgressCard(cur) }
+                    items(st.received, key = { System.identityHashCode(it) }) { r ->
+                        FileCard(r, onOpen = { openReceived(ctx, r) }, onFolder = { showInFilesApp(ctx) }, onDelete = { toDelete = r })
                     }
                 }
             }
@@ -197,23 +193,72 @@ private fun ReceivedPanel(st: FileReceiver.State, modifier: Modifier) {
     }
 }
 
-/** One selectable action at the end of a row: a round icon button, or a pill with a label. */
 @Composable
-internal fun RowAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, showLabel: Boolean = false, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    Row(
-        Modifier
-            .dpadFocus(CircleShape, focusScale = 1f)
-            .clip(CircleShape)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .heightIn(min = 44.dp)
-            .widthIn(min = 44.dp)
-            .padding(horizontal = if (showLabel) 14.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+private fun ProgressCard(cur: FileReceiver.Progress) {
+    Column(
+        Modifier.width(230.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.16f), CardShape).padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        if (showLabel) Text(label, style = MaterialTheme.typography.labelLarge, color = g.textDim)
-        Icon(icon, contentDescription = label, tint = g.textDim)
+        Text(stringResource(R.string.files_receiving_now), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f))
+        Text(cur.name, style = MaterialTheme.typography.bodyLarge, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LinearProgressIndicator(
+                progress = { if (cur.total > 0) cur.done.toFloat() / cur.total else 0f },
+                modifier = Modifier.fillMaxWidth(), color = Color.White, trackColor = Color.White.copy(alpha = 0.25f),
+            )
+            val pct = if (cur.total > 0) (100 * cur.done / cur.total).toInt() else 0
+            Text("${sizeText(cur.done)} / ${sizeText(cur.total)}  ·  $pct%", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
+        }
+    }
+}
+
+/** One received file: tap to open; two small buttons show it in the Files app or delete it. */
+@Composable
+private fun FileCard(r: FileReceiver.Received, onOpen: () -> Unit, onFolder: () -> Unit, onDelete: () -> Unit) {
+    Column(
+        Modifier.width(200.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.16f), CardShape).padding(8.dp),
+    ) {
+        Column(
+            Modifier.weight(1f).fillMaxWidth()
+                .dpadFocus(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onOpen)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(fileIcon(r), null, Modifier.size(26.dp), tint = Color.White)
+            Column {
+                Text(r.name, style = MaterialTheme.typography.bodyMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(sizeText(r.size), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.75f))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TileAction(stringResource(R.string.files_open_folder), Icons.Rounded.FolderOpen, onFolder)
+            TileAction(stringResource(R.string.files_delete), Icons.Rounded.DeleteOutline, onDelete)
+        }
+    }
+}
+
+private fun fileIcon(r: FileReceiver.Received): ImageVector = when {
+    r.mime.startsWith("video/") -> Icons.Rounded.Movie
+    r.mime.startsWith("image/") -> Icons.Rounded.Image
+    r.mime.startsWith("audio/") -> Icons.Rounded.MusicNote
+    r.mime == "application/vnd.android.package-archive" || r.name.endsWith(".apk", ignoreCase = true) -> Icons.Rounded.Android
+    else -> Icons.Rounded.InsertDriveFile
+}
+
+/** A small round icon button at the foot of a file card. */
+@Composable
+private fun TileAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .dpadFocus(CircleShape)
+            .clip(CircleShape)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = label, Modifier.size(22.dp), tint = Color.White.copy(alpha = 0.85f))
     }
 }
 
