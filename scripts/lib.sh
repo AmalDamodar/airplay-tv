@@ -17,7 +17,7 @@ APP_NAME="AirTV Play"
 APP_VERSION="2.3.0"
 APK_NAME="AirTV-Play.apk"
 APK_URL="https://github.com/AmalDamodar/airtv-play/releases/download/v2.3.0/$APK_NAME"
-APK_SHA256="42c53e2fb123ba567b3f2571f01cc31689125438f33fc86bdf3e4f62bcb3911f"
+APK_SHA256="e7fe471fc9b22a2db316d04aa98f6d05eed1bb4d51bf2ec0fe74e4387b9c363b"
 
 die() { echo "error: $*" >&2; exit 1; }
 
